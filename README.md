@@ -1,1 +1,1 @@
-# Algoriitma_Kutuphanesi
+# Algoritma_Kutuphanesi
