@@ -9,6 +9,7 @@ import React, { createContext, useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar, Image } from 'react-native';
+// MongoDB bağlantısı server.js'e taşındı, import kaldırıldı
 
 // Ekranları içe aktar
 import SplashScreen from './src/screens/SplashScreen';
@@ -89,6 +90,8 @@ const App = () => {
     setUsername('');
     clearViewedAlgorithms();
   };
+
+  // MongoDB bağlantısı server.js'e taşındı
 
   return (
     <AuthContext.Provider value={{ 

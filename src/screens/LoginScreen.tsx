@@ -9,15 +9,24 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
-  ImageBackground,
-  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { AuthContext, loadLogo } from '../../App';
+// User modeli artık server.js'de tanımlandı
+
+interface ApiError {
+  message: string;
+}
+
+const API_URL = 'http://10.0.2.2:3000/api'; // Android Emulator için localhost
 
 const LoginScreen = ({ navigation }: any) => {
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { setIsLoggedIn, setUsername: setContextUsername } = useContext(AuthContext);
   const [logoSource, setLogoSource] = useState(null);
 
@@ -29,30 +38,96 @@ const LoginScreen = ({ navigation }: any) => {
     }
   }, []);
 
-  const handleLogin = () => {
-    // Basit kontroller
-    if (username.length === 0 || password.length === 0) {
-      Alert.alert('Uyarı', 'Lütfen kullanıcı adı ve şifre girin');
-      return;
-    }
-    
-    // Giriş başarılı varsayalım ve kullanıcı durumunu güncelleyelim
-    setIsLoggedIn(true);
-    setContextUsername(username);
-    navigation.navigate('Home');
+  const validateEmail = (email: string) => {
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    return emailRegex.test(email);
   };
 
-  const handleSignUp = () => {
-    // Basit kontroller
-    if (username.length === 0 || password.length === 0) {
-      Alert.alert('Uyarı', 'Lütfen kullanıcı adı ve şifre girin');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Uyarı', 'Lütfen email ve şifre girin');
       return;
     }
-    
-    // Kayıt başarılı varsayalım ve kullanıcı durumunu güncelleyelim
-    setIsLoggedIn(true);
-    setContextUsername(username);
-    navigation.navigate('Home');
+
+    if (!validateEmail(email)) {
+      Alert.alert('Uyarı', 'Lütfen geçerli bir email adresi girin');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error);
+      }
+
+      setIsLoggedIn(true);
+      setContextUsername(data.username);
+      navigation.navigate('Home');
+    } catch (error) {
+      const err = error as ApiError;
+      Alert.alert('Hata', err.message || 'Giriş yapılırken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    if (!email || !username || !password || !confirmPassword) {
+      Alert.alert('Uyarı', 'Lütfen tüm alanları doldurun');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      Alert.alert('Uyarı', 'Lütfen geçerli bir email adresi girin');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Uyarı', 'Şifreler eşleşmiyor');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Uyarı', 'Şifre en az 6 karakter olmalıdır');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, username, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error);
+      }
+
+      // Kayıt başarılı, otomatik giriş yap
+      setIsLoggedIn(true);
+      setContextUsername(username);
+      navigation.navigate('Home');
+    } catch (error) {
+      const err = error as ApiError;
+      Alert.alert('Hata', err.message || 'Kayıt olurken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -93,12 +168,24 @@ const LoginScreen = ({ navigation }: any) => {
           
           <TextInput
             style={styles.input}
-            placeholder="Kullanıcı Adı"
-            value={username}
-            onChangeText={setUsername}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
             autoCapitalize="none"
             placeholderTextColor="#999"
           />
+
+          {isSignUp && (
+            <TextInput
+              style={styles.input}
+              placeholder="Kullanıcı Adı"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              placeholderTextColor="#999"
+            />
+          )}
           
           <TextInput
             style={styles.input}
@@ -108,26 +195,40 @@ const LoginScreen = ({ navigation }: any) => {
             secureTextEntry
             placeholderTextColor="#999"
           />
+
+          {isSignUp && (
+            <TextInput
+              style={styles.input}
+              placeholder="Şifre Tekrar"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              placeholderTextColor="#999"
+            />
+          )}
           
-          {isSignUp ? (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.signUpButton]} 
-              onPress={handleSignUp}
-            >
-              <Text style={styles.actionButtonText}>Kayıt Ol</Text>
-            </TouchableOpacity>
+          {loading ? (
+            <ActivityIndicator size="large" color="#FF8C00" style={styles.loader} />
           ) : (
             <TouchableOpacity 
-              style={[styles.actionButton, styles.loginButton]} 
-              onPress={handleLogin}
+              style={[styles.actionButton, isSignUp ? styles.signUpButton : styles.loginButton]} 
+              onPress={isSignUp ? handleSignUp : handleLogin}
             >
-              <Text style={styles.actionButtonText}>Giriş Yap</Text>
+              <Text style={styles.actionButtonText}>
+                {isSignUp ? 'Kayıt Ol' : 'Giriş Yap'}
+              </Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity 
             style={styles.switchModeButton}
-            onPress={() => setIsSignUp(!isSignUp)}
+            onPress={() => {
+              setIsSignUp(!isSignUp);
+              setEmail('');
+              setUsername('');
+              setPassword('');
+              setConfirmPassword('');
+            }}
           >
             <Text style={styles.switchModeText}>
               {isSignUp
@@ -326,6 +427,9 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 16,
     color: '#333',
+  },
+  loader: {
+    marginVertical: 20,
   },
 });
 
