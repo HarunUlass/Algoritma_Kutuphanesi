@@ -6,8 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { AuthContext } from '../../App';
+
+// API URL
+const API_URL = 'http://10.0.2.2:3000/api'; // Android Emulator için localhost
 
 // Example implementation of Bubble Sort in JavaScript
 const bubbleSortCode = `function bubbleSort(arr) {
@@ -64,6 +69,27 @@ const codeExamples: { [key: string]: { javascript: string } } = {
   },
 };
 
+interface ApiAlgorithm {
+  title: string;
+  complexity: {
+    time: {
+      best: string;
+      average: string;
+      worst: string;
+    };
+    space: string;
+  };
+  stability: string;
+  description: string;
+  steps: string[];
+  pros: string[];
+  cons: string[];
+  exampleCode: {
+    language: string;
+    code: string;
+  };
+}
+
 interface AlgorithmDetail {
   title: string;
   complexity?: {
@@ -82,37 +108,8 @@ interface AlgorithmDetail {
   cons: string[];
 }
 
+// Statik algoritma detayları (API'den gelene kadar bunlar gösterilecek)
 const algorithmDetails: { [key: string]: AlgorithmDetail } = {
-  'Bubble Sort': {
-    title: 'Bubble Sort',
-    complexity: {
-      time: {
-        best: 'O(n)',
-        average: 'O(n²)',
-        worst: 'O(n²)',
-      },
-      space: 'O(1)',
-    },
-    stability: 'Kararlı',
-    description: 'Bubble Sort, dizideki her elemanı komşusu ile karşılaştırarak çalışan basit bir sıralama algoritmasıdır. Her geçişte en büyük eleman dizinin sonuna taşınır.',
-    steps: [
-      'Dizinin ilk elemanından başlayarak her elemanı bir sonraki ile karşılaştır.',
-      'Eğer şu anki eleman bir sonrakinden büyükse, elemanları yer değiştir.',
-      'Dizinin sonuna kadar devam et.',
-      'Diziyi bir kez geçtikten sonra, en büyük eleman dizinin sonunda olacaktır.',
-      'Bu işlemi dizinin sonuna yerleştirdiğin eleman sayısı kadar azaltarak tekrarla.',
-      'Hiçbir takas işlemi gerçekleşmezse, dizi sıralanmış demektir.',
-    ],
-    pros: [
-      'Kolay uygulanabilir.',
-      'Az yer kaplar (in-place sıralama).',
-      'Kararlı bir sıralama algoritmasıdır (eşit elemanların sırası korunur).',
-    ],
-    cons: [
-      'Büyük dizilerde verimsizdir (O(n²) karmaşıklığı).',
-      'Quick Sort, Merge Sort gibi daha hızlı algoritmalardan çok daha yavaştır.',
-    ],
-  },
   'Binary Search': {
     title: 'Binary Search',
     complexity: {
@@ -147,9 +144,56 @@ const AlgorithmDetailScreen = ({ route, navigation }: any) => {
   const { algorithm } = route.params;
   const [activeTab, setActiveTab] = useState('description');
   const { isLoggedIn, addViewedAlgorithm } = useContext(AuthContext);
+  const [loading, setLoading] = useState(true);
+  const [algorithmData, setAlgorithmData] = useState<ApiAlgorithm | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
-  // Get the algorithm details or show a default message if not found
-  const details = algorithmDetails[algorithm.title as keyof typeof algorithmDetails] || {
+  // API'den algoritma detayını getir
+  useEffect(() => {
+    const fetchAlgorithmDetail = async () => {
+      try {
+        setLoading(true);
+        // Algoritma adını temizle (trim) ve encode et
+        const encodedTitle = encodeURIComponent(algorithm.title.trim());
+        const apiUrl = `${API_URL}/algorithms/${encodedTitle}`;
+        
+        console.log('Fetching algorithm details from:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('Algoritma bulunamadı');
+          }
+          const errorText = await response.text();
+          console.error('API Error Response:', errorText);
+          throw new Error(`API bağlantı hatası: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Fetched algorithm data:', JSON.stringify(data).substring(0, 100) + '...');
+        setAlgorithmData(data);
+      } catch (err: any) {
+        console.error('Algoritma detayı getirme hatası:', err);
+        setError(err.message || 'Bir hata oluştu');
+        
+        // API çalışmazsa statik verileri göster (geliştirme aşamasında yardımcı olur)
+        if (algorithmDetails[algorithm.title as keyof typeof algorithmDetails]) {
+          console.log('Yedek olarak statik algoritma detayları kullanılıyor');
+        } else {
+          Alert.alert('Hata', 'Algoritma detayları yüklenirken bir hata oluştu.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAlgorithmDetail();
+  }, [algorithm.title]);
+  
+  // Statik veya API'den gelen detayları kullan
+  const details = algorithmData || algorithmDetails[algorithm.title as keyof typeof algorithmDetails] || {
     title: algorithm.title,
     description: 'Bu algoritma için ayrıntılı bilgi bulunmamaktadır.',
     steps: [],
@@ -157,8 +201,10 @@ const AlgorithmDetailScreen = ({ route, navigation }: any) => {
     cons: [],
   };
   
-  // Get the code example or show a default message
-  const codeExample = codeExamples[algorithm.title as keyof typeof codeExamples]?.javascript || 'Bu algoritma için kod örneği bulunmamaktadır.';
+  // Kod örneğini statik örneklerden veya API'den al
+  const codeExample = algorithmData?.exampleCode?.code || 
+                     codeExamples[algorithm.title as keyof typeof codeExamples]?.javascript || 
+                     'Bu algoritma için kod örneği bulunmamaktadır.';
 
   // Kullanıcı giriş yapmışsa görüntülenen algoritmayı kaydet
   useEffect(() => {
@@ -183,6 +229,15 @@ const AlgorithmDetailScreen = ({ route, navigation }: any) => {
       return '#e74c3c'; // Kırmızı - kötü
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#3498db" />
+        <Text style={styles.loadingText}>Algoritma bilgileri yükleniyor...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -634,6 +689,15 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
 });
 
