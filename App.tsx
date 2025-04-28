@@ -18,6 +18,11 @@ import AlgorithmListScreen from './src/screens/AlgorithmListScreen';
 import AlgorithmDetailScreen from './src/screens/AlgorithmDetailScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import QuizScreen from './src/screens/QuizScreen';
+import QuizResultScreen from './src/screens/QuizResultScreen';
+
+// Global API URL (tüm uygulama için tek bir yerden yönetmek için)
+export const API_BASE_URL = 'http://10.0.2.2:3000/api'; // Android Emulator için localhost
 
 // Algoritma tipini tanımla
 export interface Algorithm {
@@ -46,6 +51,8 @@ interface AuthContextProps {
   setIsLoggedIn: (isLoggedIn: boolean) => void;
   username: string;
   setUsername: (username: string) => void;
+  userId: string;
+  setUserId: (userId: string) => void;
   viewedAlgorithms: Algorithm[];
   addViewedAlgorithm: (algorithm: Algorithm) => void;
   clearViewedAlgorithms: () => void;
@@ -57,6 +64,8 @@ export const AuthContext = createContext<AuthContextProps>({
   setIsLoggedIn: () => {},
   username: '',
   setUsername: () => {},
+  userId: '',
+  setUserId: () => {},
   viewedAlgorithms: [],
   addViewedAlgorithm: () => {},
   clearViewedAlgorithms: () => {},
@@ -68,6 +77,7 @@ const Stack = createStackNavigator();
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('');
   const [viewedAlgorithms, setViewedAlgorithms] = useState<Algorithm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -88,6 +98,7 @@ const App = () => {
   const logout = () => {
     setIsLoggedIn(false);
     setUsername('');
+    setUserId('');
     clearViewedAlgorithms();
   };
 
@@ -99,6 +110,8 @@ const App = () => {
       setIsLoggedIn, 
       username, 
       setUsername, 
+      userId,
+      setUserId,
       viewedAlgorithms,
       addViewedAlgorithm,
       clearViewedAlgorithms,
@@ -119,6 +132,8 @@ const App = () => {
           <Stack.Screen name="AlgorithmDetail" component={AlgorithmDetailScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Quiz" component={QuizScreen} />
+          <Stack.Screen name="QuizResult" component={QuizResultScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </AuthContext.Provider>

@@ -9,8 +9,25 @@ import {
   ScrollView,
 } from 'react-native';
 
+// TypeScript için interface tanımlamaları
+export interface Algorithm {
+  id: string;
+  title: string;
+  complexity: string;
+  difficulty: string;
+  description: string;
+}
+
+export interface SubCategoryMap {
+  [subCategory: string]: Algorithm[];
+}
+
+export interface CategoryMap {
+  [categoryId: string]: SubCategoryMap;
+}
+
 // Veri Yapıları alt kategorileri ve algoritmaları
-const dataStructuresSubCategories = {
+export const dataStructuresSubCategories: SubCategoryMap = {
   'Diziler': [
     {
       id: '1',
@@ -97,7 +114,7 @@ const dataStructuresSubCategories = {
 };
 
 // Derin Öğrenme alt kategorileri ve algoritmaları
-const deepLearningSubCategories = {
+export const deepLearningSubCategories: SubCategoryMap = {
   'Sinir Ağları': [
     {
       id: '1',
@@ -142,7 +159,7 @@ const deepLearningSubCategories = {
 };
 
 // Makine Öğrenmesi alt kategorileri ve algoritmaları
-const machineLearningSubCategories = {
+export const machineLearningSubCategories: SubCategoryMap = {
   'Denetimli Öğrenme': [
     {
       id: '1',
@@ -185,25 +202,29 @@ const machineLearningSubCategories = {
 };
 
 // Tüm kategorileri ve alt kategorileri birleştiren nesne
-const allCategories = {
+export const allCategories: CategoryMap = {
   '1': dataStructuresSubCategories,
   '2': deepLearningSubCategories,
   '3': machineLearningSubCategories,
   // Diğer kategoriler eklenebilir
 };
 
-const difficultyColors = {
+const difficultyColors: {[key: string]: string} = {
   'Kolay': '#27ae60',
   'Orta': '#f39c12',
   'Zor': '#e74c3c',
 };
 
 const AlgorithmListScreen = ({ route, navigation }: any) => {
-  const { category } = route.params;
+  const { category, initialSubCategory } = route.params;
   const subCategories = allCategories[category.id] || {};
   const subCategoryNames = Object.keys(subCategories);
   
-  const [selectedSubCategory, setSelectedSubCategory] = useState(subCategoryNames[0] || '');
+  const [selectedSubCategory, setSelectedSubCategory] = useState(
+    initialSubCategory && subCategoryNames.includes(initialSubCategory) 
+      ? initialSubCategory 
+      : (subCategoryNames[0] || '')
+  );
   const algorithms = subCategories[selectedSubCategory] || [];
   
   const renderAlgorithmItem = ({ item }: any) => (

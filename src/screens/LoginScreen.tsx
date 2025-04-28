@@ -11,14 +11,12 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { AuthContext, loadLogo } from '../../App';
+import { AuthContext, loadLogo, API_BASE_URL } from '../../App';
 // User modeli artık server.js'de tanımlandı
 
 interface ApiError {
   message: string;
 }
-
-const API_URL = 'http://10.0.2.2:3000/api'; // Android Emulator için localhost
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -27,7 +25,7 @@ const LoginScreen = ({ navigation }: any) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { setIsLoggedIn, setUsername: setContextUsername } = useContext(AuthContext);
+  const { setIsLoggedIn, setUsername: setContextUsername, setUserId } = useContext(AuthContext);
   const [logoSource, setLogoSource] = useState(null);
 
   useEffect(() => {
@@ -56,7 +54,7 @@ const LoginScreen = ({ navigation }: any) => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,6 +70,7 @@ const LoginScreen = ({ navigation }: any) => {
 
       setIsLoggedIn(true);
       setContextUsername(data.username);
+      setUserId(data.userId);
       navigation.navigate('Home');
     } catch (error) {
       const err = error as ApiError;
@@ -104,7 +103,7 @@ const LoginScreen = ({ navigation }: any) => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,6 +120,7 @@ const LoginScreen = ({ navigation }: any) => {
       // Kayıt başarılı, otomatik giriş yap
       setIsLoggedIn(true);
       setContextUsername(username);
+      setUserId(data.userId);
       navigation.navigate('Home');
     } catch (error) {
       const err = error as ApiError;

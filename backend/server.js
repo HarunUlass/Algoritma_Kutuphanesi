@@ -679,43 +679,64 @@ app.post('/api/quizzes/:quizId/start', async (req, res) => {
     const { quizId } = req.params;
     const { userId } = req.body;
     
-    // Kullanıcı ve quiz'in var olup olmadığını kontrol et
-    const [user, quiz] = await Promise.all([
-      User.findById(userId),
-      Quiz.findById(quizId)
-    ]);
+    console.log(`Quiz başlatma isteği: quizId=${quizId}, userId=${userId || 'Misafir kullanıcı'}`);
     
-    if (!user) {
-      return res.status(404).json({
-        error: 'Kullanıcı bulunamadı'
-      });
-    }
+    // Önce quizi bul
+    const quiz = await Quiz.findById(quizId);
     
     if (!quiz) {
+      console.error(`Quiz bulunamadı: ${quizId}`);
       return res.status(404).json({
         error: 'Quiz bulunamadı'
       });
     }
     
-    // Aktif bir girişim olup olmadığını kontrol et
-    const activeAttempt = await QuizAttempt.findOne({
-      userId,
-      quizId,
-      completed: false
-    });
+    console.log(`Quiz bulundu: ${quiz.title}`);
     
-    if (activeAttempt) {
-      return res.json(activeAttempt);
+    // Kullanıcı kimliği sağlanmışsa, kullanıcıyı kontrol et
+    let user = null;
+    if (userId) {
+      user = await User.findById(userId);
+      
+      if (!user) {
+        console.error(`Kullanıcı bulunamadı: ${userId}`);
+        // Kullanıcı bulunamadıysa bile quiz'e devam edebilir,
+        // ancak ilerleme kaydedilmeyecek
+        console.log('Kullanıcı bulunamadı. Misafir modunda devam ediliyor.');
+      }
     }
     
-    // Yeni bir girişim oluştur
-    const newAttempt = new QuizAttempt({
-      userId,
-      quizId,
-      startTime: new Date()
-    });
+    let attemptId = null;
     
-    await newAttempt.save();
+    // Kullanıcı varsa aktif girişim kontrolü yap
+    if (user) {
+      // Aktif bir girişim olup olmadığını kontrol et
+      const activeAttempt = await QuizAttempt.findOne({
+        userId,
+        quizId,
+        completed: false
+      });
+      
+      if (activeAttempt) {
+        console.log(`Aktif quiz girişimi bulundu: ${activeAttempt._id}`);
+        attemptId = activeAttempt._id;
+      } else {
+        // Yeni bir girişim oluştur
+        const newAttempt = new QuizAttempt({
+          userId,
+          quizId,
+          startTime: new Date()
+        });
+        
+        await newAttempt.save();
+        console.log(`Yeni quiz girişimi oluşturuldu: ${newAttempt._id}`);
+        attemptId = newAttempt._id;
+      }
+    } else {
+      // Misafir kullanıcı için geçici bir girişim oluştur (kaydedilmez)
+      console.log('Misafir kullanıcı için geçici girişim kimliği oluşturuluyor');
+      attemptId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    }
     
     // Soruları gizleyerek quiz verilerini gönder
     const quizData = {
@@ -733,20 +754,23 @@ app.post('/api/quizzes/:quizId/start', async (req, res) => {
           text: o.text
         }))
       })),
-      codeCompletionQuestions: quiz.codeCompletionQuestions.map(q => ({
-        _id: q._id,
-        question: q.question,
-        codeTemplate: q.codeTemplate,
-        hints: q.hints
-      })),
-      attemptId: newAttempt._id
+      codeCompletionQuestions: quiz.codeCompletionQuestions && quiz.codeCompletionQuestions.length > 0 
+        ? quiz.codeCompletionQuestions.map(q => ({
+            _id: q._id,
+            question: q.question,
+            codeTemplate: q.codeTemplate,
+            hints: q.hints
+          }))
+        : [],
+      attemptId: attemptId
     };
     
-    res.status(201).json(quizData);
+    console.log(`Quiz verisi hazırlandı, sorular: MC=${quizData.multipleChoiceQuestions.length}, CC=${quizData.codeCompletionQuestions.length}`);
+    res.status(200).json(quizData);
   } catch (error) {
     console.error('Quiz başlatma hatası:', error);
     res.status(500).json({
-      error: 'Quiz başlatırken bir hata oluştu'
+      error: `Quiz başlatırken bir hata oluştu: ${error.message}`
     });
   }
 });

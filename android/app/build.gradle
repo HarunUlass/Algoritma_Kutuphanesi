@@ -105,6 +105,14 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+    
+    // React Native Vector Icons için
+    // Apply the `react-native-vector-icons` fontları assets klasörüne kopyala
+    sourceSets {
+        main {
+            assets.srcDirs += "../../node_modules/react-native-vector-icons/fonts"
+        }
+    }
 }
 
 dependencies {
@@ -116,4 +124,7 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    
+    // Vector Icons için gerekli
+    implementation project(':react-native-vector-icons')
 }

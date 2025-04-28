@@ -103,7 +103,7 @@ interface AlgorithmDetail {
   stability?: string;
   prerequisites?: string;
   description: string;
-  steps: string[];
+  steps: string[] | { [key: string]: string[] } | any; // Farklı adım formatlarını destekle
   pros: string[];
   cons: string[];
 }
@@ -280,6 +280,15 @@ const AlgorithmDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.descriptionContainer}>
             {/* Algoritma özeti bölümü */}
             <View style={styles.summarySection}>
+              {/* Stabilite bilgisi */}
+              {details.stability && (
+                <View style={styles.stabilityContainer}>
+                  <Text style={styles.stabilityLabel}>Stabilite:</Text>
+                  <Text style={styles.stabilityValue}>{details.stability}</Text>
+                </View>
+              )}
+
+              {/* Algoritma açıklaması */}
               <Text style={styles.descriptionText}>{details.description}</Text>
             </View>
 
@@ -288,85 +297,138 @@ const AlgorithmDetailScreen = ({ route, navigation }: any) => {
               <Text style={styles.sectionTitle}>Karmaşıklık</Text>
               {details.complexity && (
                 <View style={styles.complexityContainer}>
-                  <View style={styles.complexityRow}>
-                    <Text style={styles.complexityLabel}>Zaman (En İyi):</Text>
-                    <View style={[styles.complexityBadge, { backgroundColor: getComplexityColor(details.complexity.time?.best || '') + '20' }]}>
-                      <Text style={[styles.complexityValue, { color: getComplexityColor(details.complexity.time?.best || '') }]}>
-                        {details.complexity.time?.best}
-                      </Text>
+                  {details.complexity.time && (
+                    <View style={styles.complexityBlock}>
+                      <Text style={styles.complexityLabel}>Zaman Karmaşıklığı</Text>
+                      <View style={styles.complexityValues}>
+                        {details.complexity.time.best && (
+                          <View style={styles.complexityItem}>
+                            <Text style={styles.complexityType}>En İyi:</Text>
+                            <Text style={[
+                              styles.complexityValue,
+                              { color: getComplexityColor(details.complexity.time.best) }
+                            ]}>
+                              {details.complexity.time.best}
+                            </Text>
+                          </View>
+                        )}
+                        
+                        {details.complexity.time.average && (
+                          <View style={styles.complexityItem}>
+                            <Text style={styles.complexityType}>Ortalama:</Text>
+                            <Text style={[
+                              styles.complexityValue,
+                              { color: getComplexityColor(details.complexity.time.average) }
+                            ]}>
+                              {details.complexity.time.average}
+                            </Text>
+                          </View>
+                        )}
+                        
+                        {details.complexity.time.worst && (
+                          <View style={styles.complexityItem}>
+                            <Text style={styles.complexityType}>En Kötü:</Text>
+                            <Text style={[
+                              styles.complexityValue,
+                              { color: getComplexityColor(details.complexity.time.worst) }
+                            ]}>
+                              {details.complexity.time.worst}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.complexityRow}>
-                    <Text style={styles.complexityLabel}>Zaman (Ortalama):</Text>
-                    <View style={[styles.complexityBadge, { backgroundColor: getComplexityColor(details.complexity.time?.average || '') + '20' }]}>
-                      <Text style={[styles.complexityValue, { color: getComplexityColor(details.complexity.time?.average || '') }]}>
-                        {details.complexity.time?.average}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.complexityRow}>
-                    <Text style={styles.complexityLabel}>Zaman (En Kötü):</Text>
-                    <View style={[styles.complexityBadge, { backgroundColor: getComplexityColor(details.complexity.time?.worst || '') + '20' }]}>
-                      <Text style={[styles.complexityValue, { color: getComplexityColor(details.complexity.time?.worst || '') }]}>
-                        {details.complexity.time?.worst}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.complexityRow}>
-                    <Text style={styles.complexityLabel}>Yer:</Text>
-                    <View style={[styles.complexityBadge, { backgroundColor: getComplexityColor(details.complexity.space) + '20' }]}>
-                      <Text style={[styles.complexityValue, { color: getComplexityColor(details.complexity.space) }]}>
+                  )}
+                  
+                  {details.complexity.space && (
+                    <View style={styles.complexityBlock}>
+                      <Text style={styles.complexityLabel}>Alan Karmaşıklığı</Text>
+                      <Text style={[
+                        styles.complexityValue,
+                        { color: getComplexityColor(details.complexity.space) }
+                      ]}>
                         {details.complexity.space}
                       </Text>
                     </View>
-                  </View>
+                  )}
                 </View>
               )}
             </View>
 
             {/* Adımlar bölümü */}
-            {details.steps.length > 0 && (
+            {details.steps && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Adımlar</Text>
                 <View style={styles.stepsContainer}>
-                  {details.steps.map((step: string, index: number) => (
-                    <View key={index} style={styles.stepItem}>
-                      <View style={styles.stepNumberContainer}>
-                        <Text style={styles.stepNumber}>{index + 1}</Text>
+                  {Array.isArray(details.steps) ? (
+                    // Adımlar bir dizi ise doğrudan görüntüle
+                    details.steps.map((step: string, index: number) => (
+                      <View key={index} style={styles.stepItem}>
+                        <View style={styles.stepNumberContainer}>
+                          <Text style={styles.stepNumber}>{index + 1}</Text>
+                        </View>
+                        <Text style={styles.stepText}>{step}</Text>
                       </View>
-                      <Text style={styles.stepText}>{step}</Text>
-                    </View>
-                  ))}
+                    ))
+                  ) : typeof details.steps === 'object' && details.steps !== null ? (
+                    // Adımlar bir nesne ise (kategorilere ayrılmış adımlar)
+                    Object.entries(details.steps).map(([category, steps]: [string, any], categoryIndex: number) => (
+                      <View key={category} style={styles.stepCategory}>
+                        <Text style={styles.stepCategoryTitle}>{category.replace('_', ' ')}</Text>
+                        {Array.isArray(steps) ? (
+                          steps.map((step: string, stepIndex: number) => (
+                            <View key={`${category}-${stepIndex}`} style={styles.stepItem}>
+                              <View style={styles.stepNumberContainer}>
+                                <Text style={styles.stepNumber}>{stepIndex + 1}</Text>
+                              </View>
+                              <Text style={styles.stepText}>{step}</Text>
+                            </View>
+                          ))
+                        ) : (
+                          <Text style={styles.stepText}>Adım detayları mevcut değil</Text>
+                        )}
+                      </View>
+                    ))
+                  ) : (
+                    // Adımlar beklenmeyen bir formatta ise
+                    <Text style={styles.stepText}>Adım detayları mevcut değil</Text>
+                  )}
                 </View>
               </View>
             )}
 
             {/* Avantajlar ve Dezavantajlar bölümü */}
-            <View style={styles.prosConsContainer}>
-              <View style={[styles.section, styles.prosSection]}>
-                <Text style={styles.sectionTitle}>Avantajlar</Text>
-                <View style={styles.prosConsContent}>
-                  {details.pros.map((pro: string, index: number) => (
-                    <View key={index} style={styles.proItem}>
-                      <Text style={styles.prosConsIcon}>✓</Text>
-                      <Text style={styles.proConText}>{pro}</Text>
+            {(details.pros || details.cons) && (
+              <View style={styles.prosConsContainer}>
+                {details.pros && details.pros.length > 0 && (
+                  <View style={[styles.section, styles.prosSection]}>
+                    <Text style={styles.sectionTitle}>Avantajlar</Text>
+                    <View style={styles.prosConsContent}>
+                      {details.pros.map((pro: string, index: number) => (
+                        <View key={index} style={styles.proItem}>
+                          <Text style={styles.prosConsIcon}>✓</Text>
+                          <Text style={styles.proConText}>{pro}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
-                </View>
-              </View>
+                  </View>
+                )}
 
-              <View style={[styles.section, styles.consSection]}>
-                <Text style={styles.sectionTitle}>Dezavantajlar</Text>
-                <View style={styles.prosConsContent}>
-                  {details.cons.map((con: string, index: number) => (
-                    <View key={index} style={styles.conItem}>
-                      <Text style={styles.prosConsIcon}>✕</Text>
-                      <Text style={styles.proConText}>{con}</Text>
+                {details.cons && details.cons.length > 0 && (
+                  <View style={[styles.section, styles.consSection]}>
+                    <Text style={styles.sectionTitle}>Dezavantajlar</Text>
+                    <View style={styles.prosConsContent}>
+                      {details.cons.map((con: string, index: number) => (
+                        <View key={index} style={styles.conItem}>
+                          <Text style={styles.prosConsIcon}>✕</Text>
+                          <Text style={styles.proConText}>{con}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
-                </View>
+                  </View>
+                )}
               </View>
-            </View>
+            )}
           </View>
         )}
 
@@ -529,23 +591,26 @@ const styles = StyleSheet.create({
   complexityContainer: {
     gap: 10,
   },
-  complexityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  complexityBlock: {
+    marginBottom: 15,
   },
   complexityLabel: {
     fontSize: 15,
     color: '#2c3e50',
-    flex: 1,
+    fontWeight: 'bold',
+    marginBottom: 15,
   },
-  complexityBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
+  complexityValues: {
+    gap: 10,
+  },
+  complexityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 80,
+  },
+  complexityType: {
+    fontSize: 14,
+    color: '#7f8c8d',
   },
   complexityValue: {
     fontSize: 14,
@@ -698,6 +763,30 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+  },
+  stepCategory: {
+    marginBottom: 16,
+  },
+  stepCategoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
+    textTransform: 'capitalize',
+  },
+  stabilityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stabilityLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  stabilityValue: {
+    fontSize: 14,
+    color: '#34495e',
   },
 });
 
