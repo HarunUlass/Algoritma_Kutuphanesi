@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   FlatList,
+  Alert,
 } from 'react-native';
 import { AuthContext, API_BASE_URL } from '../../App';
 
@@ -31,42 +32,310 @@ const QuizResultScreen = ({ route, navigation }: any) => {
   const loadResultDetails = async () => {
     try {
       setLoading(true);
+      console.log(`Sonuç detayları yükleniyor: quizId=${quizId}, attemptId=${attemptId}`);
       
-      // Quiz ve attempt detaylarını paralel olarak yükle
-      const [quizResponse, attemptResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/quizzes/${quizId}`),
-        fetch(`${API_BASE_URL}/quiz-attempts/${attemptId}`)
-      ]);
-      
-      if (!quizResponse.ok || !attemptResponse.ok) {
-        throw new Error('Sonuç detayları yüklenemedi');
+      // Önce quiz verilerini yükle
+      let quizData = null;
+      try {
+        // Timeout ekleyerek ağ isteklerinin çok uzun sürmesini engelle
+        const quizPromise = fetch(`${API_BASE_URL}/quizzes/${quizId}`);
+        let quizResponse;
+        
+        try {
+          quizResponse = await Promise.race([
+            quizPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('İstek zaman aşımına uğradı')), 10000))
+          ]);
+        } catch (timeoutError) {
+          console.error('Quiz verisi zaman aşımı hatası:', timeoutError);
+          throw new Error('Quiz verisi yüklenirken zaman aşımı oluştu');
+        }
+        
+        if (!quizResponse || !quizResponse.ok) {
+          console.error(`Quiz API yanıt hatası: ${quizResponse?.status || 'Yanıt alınamadı'}`);
+          throw new Error(`Quiz bilgisi alınamadı (${quizResponse?.status || 'Bağlantı hatası'})`);
+        }
+        
+        try {
+          quizData = await quizResponse.json();
+          console.log('Quiz verileri başarıyla yüklendi');
+          setQuizDetails(quizData);
+        } catch (parseError) {
+          console.error('Quiz verisi JSON ayrıştırma hatası:', parseError);
+          throw new Error('Quiz verisi geçerli bir format değil');
+        }
+      } catch (quizError) {
+        console.error('Quiz verisi yükleme hatası:', quizError);
+        // Quiz verisi yüklenemezse, boş bir quiz objesi oluştur
+        // Bu, UI'ın çökmesini engelleyecek
+        setQuizDetails({
+          multipleChoiceQuestions: [],
+          codeCompletionQuestions: []
+        });
+        console.log('Boş quiz detayları oluşturuldu');
+        // Hatayı yukarı fırlatma, devam et
       }
       
-      const [quizData, attemptData] = await Promise.all([
-        quizResponse.json(),
-        attemptResponse.json()
-      ]);
+      // Sonra attempt verilerini yükle
+      try {
+        // Timeout ekleyerek ağ isteklerinin çok uzun sürmesini engelle
+        const attemptPromise = fetch(`${API_BASE_URL}/quiz-attempts/${attemptId}`);
+        let attemptResponse;
+        
+        try {
+          attemptResponse = await Promise.race([
+            attemptPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('İstek zaman aşımına uğradı')), 10000))
+          ]);
+        } catch (timeoutError) {
+          console.error('Attempt verisi zaman aşımı hatası:', timeoutError);
+          throw new Error('Attempt verisi yüklenirken zaman aşımı oluştu');
+        }
+        
+        if (!attemptResponse || !attemptResponse.ok) {
+          console.error(`Attempt API yanıt hatası: ${attemptResponse?.status || 'Yanıt alınamadı'}`);
+          
+          // 404 hatası için özel mesaj
+          if (attemptResponse?.status === 404) {
+            console.log('Attempt kaydı bulunamadı (404), fallback verisi kullanılıyor');
+          } else {
+            console.log(`Attempt API ${attemptResponse?.status || 'bağlantı'} hatası, fallback verisi kullanılıyor`);
+          }
+          
+          // Attempt verisi yüklenemezse, route params'tan gelen verileri kullanarak basit bir attempt objesi oluştur
+          // 404 hatası durumunda bile sonuçların gösterilmesini sağlamak için boş cevap dizileri oluşturuyoruz
+          const fallbackAttempt = {
+            quizId,
+            score,
+            totalPossible,
+            passed,
+            // Boş cevap dizileri yerine, en azından soru sayısı kadar boş cevap oluşturalım
+            // Bu, kullanıcının en azından soru sayısını görmesini sağlar
+            multipleChoiceAnswers: quizDetails?.multipleChoiceQuestions?.map((_, index) => ({
+              questionIndex: index,
+              isCorrect: false,  // Varsayılan olarak yanlış kabul ediyoruz
+              selectedOptions: [] // Seçilen cevaplar bilinmiyor
+            })) || [],
+            codeCompletionAnswers: quizDetails?.codeCompletionQuestions?.map((_, index) => ({
+              questionIndex: index,
+              isCorrect: false,  // Varsayılan olarak yanlış kabul ediyoruz
+              userCode: ''       // Kullanıcı kodu bilinmiyor
+            })) || [],
+            // Fallback olduğunu belirten bir bayrak ekleyelim
+            isFallback: true
+          };
+          
+          console.log('Fallback attempt verisi oluşturuldu');
+          setQuizAttempt(fallbackAttempt);
+        } else {
+          try {
+            const attemptData = await attemptResponse.json();
+            console.log('Attempt verileri başarıyla yüklendi');
+            
+            // Veri bütünlüğünü kontrol et ve eksik alanları tamamla
+            const validatedAttempt = {
+              ...(attemptData || {}),
+              quizId: attemptData?.quizId || quizId,
+              score: attemptData?.score !== undefined ? attemptData.score : score,
+              totalPossible: attemptData?.totalPossible !== undefined ? attemptData.totalPossible : totalPossible,
+              passed: attemptData?.passed !== undefined ? attemptData.passed : passed,
+              multipleChoiceAnswers: Array.isArray(attemptData?.multipleChoiceAnswers) ? attemptData.multipleChoiceAnswers : [],
+              codeCompletionAnswers: Array.isArray(attemptData?.codeCompletionAnswers) ? attemptData.codeCompletionAnswers : []
+            };
+            
+            setQuizAttempt(validatedAttempt);
+          } catch (parseError) {
+            console.error('Attempt verisi JSON ayrıştırma hatası:', parseError);
+            
+            // JSON ayrıştırma hatası durumunda fallback verisi kullan
+            const fallbackAttempt = {
+              quizId,
+              score,
+              totalPossible,
+              passed,
+              multipleChoiceAnswers: quizDetails?.multipleChoiceQuestions?.map((_, index) => ({
+                questionIndex: index,
+                isCorrect: false,
+                selectedOptions: []
+              })) || [],
+              codeCompletionAnswers: quizDetails?.codeCompletionQuestions?.map((_, index) => ({
+                questionIndex: index,
+                isCorrect: false,
+                userCode: ''
+              })) || [],
+              isFallback: true,
+              parseError: true
+            };
+            
+            console.log('JSON ayrıştırma hatası nedeniyle fallback verisi kullanılıyor');
+            setQuizAttempt(fallbackAttempt);
+          }
+        }
+      } catch (attemptError) {
+        console.error('Attempt verisi yükleme hatası:', attemptError);
+        
+        // Hata mesajını kaydet
+        let errorType = 'network';
+        if (attemptError instanceof Error) {
+          if (attemptError.message.includes('zaman aşımı')) {
+            errorType = 'timeout';
+          }
+        }
+        
+        // Attempt verisi yüklenemezse, route params'tan gelen verileri kullanarak basit bir attempt objesi oluştur
+        const fallbackAttempt = {
+          quizId: quizId || '',
+          score: score !== undefined ? score : 0,
+          totalPossible: totalPossible !== undefined ? totalPossible : 0,
+          passed: passed !== undefined ? passed : false,
+          // Boş cevap dizileri yerine, en azından soru sayısı kadar boş cevap oluşturalım
+          // Bu, kullanıcının en azından soru sayısını görmesini sağlar
+          multipleChoiceAnswers: quizDetails?.multipleChoiceQuestions?.map((_, index) => ({
+            questionIndex: index,
+            isCorrect: false,  // Varsayılan olarak yanlış kabul ediyoruz
+            selectedOptions: [] // Seçilen cevaplar bilinmiyor
+          })) || [],
+          codeCompletionAnswers: quizDetails?.codeCompletionQuestions?.map((_, index) => ({
+            questionIndex: index,
+            isCorrect: false,  // Varsayılan olarak yanlış kabul ediyoruz
+            userCode: ''       // Kullanıcı kodu bilinmiyor
+          })) || [],
+          // Fallback olduğunu belirten bayraklar ekleyelim
+          isFallback: true,
+          errorType: errorType
+        };
+        
+        console.log(`${errorType === 'timeout' ? 'Zaman aşımı' : 'Ağ'} hatası nedeniyle fallback verisi kullanılıyor`);
+        setQuizAttempt(fallbackAttempt);
+      }
       
-      setQuizDetails(quizData);
-      setQuizAttempt(attemptData);
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sonuç detayları yükleme hatası:', error);
+      
+      // Hata mesajını belirle
+      let errorMessage = 'Sonuç detayları yüklenemedi. Lütfen tekrar deneyin.';
+      let is404Error = false;
+      let isTimeoutError = false;
+      
+      // Hata türünü belirle
+      if (error && error.message) {
+        // Eğer 404 hatası varsa daha açıklayıcı bir mesaj göster ve bayrak ayarla
+        if (error.message.includes('404')) {
+          errorMessage = 'Sınav sonuç detayları sunucuda bulunamadı. Özet bilgiler gösterilecek.';
+          is404Error = true;
+        } else if (error.message.includes('zaman aşımı')) {
+          errorMessage = 'Sunucu yanıt vermedi. İnternet bağlantınızı kontrol edip tekrar deneyin.';
+          isTimeoutError = true;
+        } else if (error.message.includes('geçerli bir format değil') || error.message.includes('JSON')) {
+          errorMessage = 'Sunucudan gelen veri formatı geçersiz. Lütfen daha sonra tekrar deneyin.';
+        }
+      }
+      
+      // 404 hatası veya diğer hatalar için fallback verisi oluştur ve devam et
+      if (is404Error || isTimeoutError) {
+        // Fallback attempt objesi oluştur
+        const fallbackAttempt = {
+          quizId: quizId || '',
+          score: score !== undefined ? score : 0,
+          totalPossible: totalPossible !== undefined ? totalPossible : 0,
+          passed: passed !== undefined ? passed : false,
+          // Boş cevap dizileri yerine, en azından soru sayısı kadar boş cevap oluşturalım
+          multipleChoiceAnswers: quizDetails?.multipleChoiceQuestions?.map((_, index) => ({
+            questionIndex: index,
+            isCorrect: false,
+            selectedOptions: []
+          })) || [],
+          codeCompletionAnswers: quizDetails?.codeCompletionQuestions?.map((_, index) => ({
+            questionIndex: index,
+            isCorrect: false,
+            userCode: ''
+          })) || [],
+          isFallback: true,
+          errorType: is404Error ? '404' : 'timeout'
+        };
+        
+        setQuizAttempt(fallbackAttempt);
+        setLoading(false);
+        
+        // Kullanıcıya bilgi mesajı göster ama ekranı kapatma
+        Alert.alert(
+          'Bilgi',
+          errorMessage,
+          [{ text: 'Tamam', style: 'default' }]
+        );
+        
+        return; // Ana hata işleyiciden çık
+      }
+      
+      // Diğer hatalar için kullanıcıya hata mesajı göster ve geri dönme seçeneği sun
+      Alert.alert(
+        'Hata',
+        errorMessage,
+        [
+          { text: 'Geri Dön', onPress: () => navigation.goBack() },
+          { text: 'Tekrar Dene', onPress: () => loadResultDetails() }
+        ]
+      );
     } finally {
       setLoading(false);
     }
   };
   
   const calculatePercentage = () => {
+    // Sıfıra bölme hatasını önlemek için kontrol ekleyelim
+    if (!totalPossible || totalPossible <= 0) {
+      return 0;
+    }
     return Math.round((score / totalPossible) * 100);
   };
   
   const renderMCQuestionResult = ({ item, index }: any) => {
     // Quiz detaylarından soruyu bul
-    const question = quizDetails?.multipleChoiceQuestions[item.questionIndex];
-    if (!question) return null;
-    
+    const question = quizDetails?.multipleChoiceQuestions?.[item.questionIndex];
     const isCorrect = item.isCorrect;
+    const isFallback = quizAttempt?.isFallback;
+    
+    // Eğer soru bulunamadıysa, basitleştirilmiş bir görünüm göster
+    if (!question) {
+      console.log(`Soru bulunamadı: MC soru indeksi ${item.questionIndex}`);
+      return (
+        <View style={[styles.questionResultItem, isCorrect ? styles.correctItem : styles.incorrectItem]}>
+          <View style={styles.questionResultHeader}>
+            <Text style={styles.questionResultNumber}>Soru {item.questionIndex + 1}</Text>
+            <View style={[styles.resultBadge, isCorrect ? styles.correctBadge : styles.incorrectBadge]}>
+              <Text style={styles.resultBadgeText}>
+                {isCorrect ? 'Doğru' : 'Yanlış'}
+              </Text>
+            </View>
+          </View>
+          
+          <Text style={styles.questionText}>
+            {isFallback ? 
+              `Çoktan seçmeli soru ${item.questionIndex + 1} - Detaylar sunucudan alınamadı` : 
+              'Soru detayları yüklenemedi.'}
+          </Text>
+          
+          <View style={styles.optionsContainer}>
+            {isFallback ? (
+              <Text style={styles.fallbackInfoText}>
+                404 hatası nedeniyle soru detayları gösterilemiyor. Sonuçlarınızı daha sonra tekrar kontrol edebilirsiniz.
+              </Text>
+            ) : (
+              <Text style={styles.emptyStateText}>Seçenekler görüntülenemiyor.</Text>
+            )}
+          </View>
+          
+          {item.selectedOptions && item.selectedOptions.length > 0 && (
+            <View style={styles.userAnswerContainer}>
+              <Text style={styles.userAnswerTitle}>Cevabınız:</Text>
+              <Text style={styles.userAnswerText}>
+                {item.selectedOptions.map((opt: number) => String.fromCharCode(65 + opt)).join(', ')}
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    }
     
     return (
       <View style={[styles.questionResultItem, isCorrect ? styles.correctItem : styles.incorrectItem]}>
@@ -82,8 +351,8 @@ const QuizResultScreen = ({ route, navigation }: any) => {
         <Text style={styles.questionText}>{question.question}</Text>
         
         <View style={styles.optionsContainer}>
-          {question.options.map((option: any, optIndex: number) => {
-            const isSelected = item.selectedOptions.includes(optIndex);
+          {Array.isArray(question.options) ? question.options.map((option: any, optIndex: number) => {
+            const isSelected = Array.isArray(item.selectedOptions) && item.selectedOptions.includes(optIndex);
             const isCorrectOption = option.isCorrect;
             
             let optionStyle = styles.optionItem;
@@ -103,10 +372,12 @@ const QuizResultScreen = ({ route, navigation }: any) => {
                 <Text style={styles.optionText}>{option.text}</Text>
               </View>
             );
-          })}
+          }) : (
+            <Text style={styles.emptyStateText}>Seçenekler yüklenemedi.</Text>
+          )}
         </View>
         
-        {!isCorrect && question.options.some((o: any) => o.explanation) && (
+        {!isCorrect && Array.isArray(question.options) && question.options.some((o: any) => o.explanation) && (
           <View style={styles.explanationContainer}>
             <Text style={styles.explanationTitle}>Açıklama:</Text>
             {question.options
@@ -122,11 +393,52 @@ const QuizResultScreen = ({ route, navigation }: any) => {
   
   const renderCodeQuestionResult = ({ item, index }: any) => {
     // Quiz detaylarından soruyu bul
-    const question = quizDetails?.codeCompletionQuestions[item.questionIndex];
-    if (!question) return null;
-    
+    const question = quizDetails?.codeCompletionQuestions?.[item.questionIndex];
     const isCorrect = item.isCorrect;
-    const questionIndex = quizDetails.multipleChoiceQuestions.length + item.questionIndex + 1;
+    const questionIndex = (quizDetails?.multipleChoiceQuestions?.length || 0) + item.questionIndex + 1;
+    const isFallback = quizAttempt?.isFallback;
+    
+    // Eğer soru bulunamadıysa, basitleştirilmiş bir görünüm göster
+    if (!question) {
+      console.log(`Soru bulunamadı: Kod tamamlama soru indeksi ${item.questionIndex}`);
+      return (
+        <View style={[styles.questionResultItem, isCorrect ? styles.correctItem : styles.incorrectItem]}>
+          <View style={styles.questionResultHeader}>
+            <Text style={styles.questionResultNumber}>Soru {questionIndex}</Text>
+            <View style={[styles.resultBadge, isCorrect ? styles.correctBadge : styles.incorrectBadge]}>
+              <Text style={styles.resultBadgeText}>
+                {isCorrect ? 'Doğru' : 'Yanlış'}
+              </Text>
+            </View>
+          </View>
+          
+          <Text style={styles.questionText}>
+            {isFallback ? 
+              `Kod tamamlama sorusu ${item.questionIndex + 1} - Detaylar sunucudan alınamadı` : 
+              'Soru detayları yüklenemedi.'}
+          </Text>
+          
+          {item.userCode && (
+            <View style={styles.codeContainer}>
+              <Text style={styles.codeTitle}>Cevabınız:</Text>
+              <Text style={styles.codeText}>{item.userCode}</Text>
+            </View>
+          )}
+          
+          {!isCorrect && (
+            <View style={styles.emptyStateContainer}>
+              {isFallback ? (
+                <Text style={styles.fallbackInfoText}>
+                  404 hatası nedeniyle çözüm bilgisi gösterilemiyor. Sonuçlarınızı daha sonra tekrar kontrol edebilirsiniz.
+                </Text>
+              ) : (
+                <Text style={styles.emptyStateText}>Çözüm bilgisi yüklenemedi.</Text>
+              )}
+            </View>
+          )}
+        </View>
+      );
+    }
     
     return (
       <View style={[styles.questionResultItem, isCorrect ? styles.correctItem : styles.incorrectItem]}>
@@ -139,14 +451,14 @@ const QuizResultScreen = ({ route, navigation }: any) => {
           </View>
         </View>
         
-        <Text style={styles.questionText}>{question.question}</Text>
+        <Text style={styles.questionText}>{question.question || 'Soru metni yüklenemedi'}</Text>
         
         <View style={styles.codeContainer}>
           <Text style={styles.codeTitle}>Cevabınız:</Text>
-          <Text style={styles.codeText}>{item.userCode}</Text>
+          <Text style={styles.codeText}>{item.userCode || 'Cevap bulunamadı'}</Text>
         </View>
         
-        {!isCorrect && (
+        {!isCorrect && question.solution && (
           <View style={styles.solutionContainer}>
             <Text style={styles.solutionTitle}>Çözüm:</Text>
             <Text style={styles.solutionText}>{question.solution}</Text>
@@ -191,11 +503,11 @@ const QuizResultScreen = ({ route, navigation }: any) => {
       <ScrollView style={styles.scrollContainer}>
         {/* Sonuç Özeti */}
         <View style={styles.resultSummaryContainer}>
-          <Text style={styles.quizTitle}>{quizTitle}</Text>
+          <Text style={styles.quizTitle}>{quizTitle || 'Quiz Sonuçları'}</Text>
           
           <View style={styles.resultCircle}>
             <Text style={styles.resultPercentage}>{calculatePercentage()}%</Text>
-            <Text style={styles.resultScore}>{score}/{totalPossible}</Text>
+            <Text style={styles.resultScore}>{score || 0}/{totalPossible || 0}</Text>
           </View>
           
           <View style={[styles.statusBadge, passed ? styles.passedBadge : styles.failedBadge]}>
@@ -208,14 +520,18 @@ const QuizResultScreen = ({ route, navigation }: any) => {
             <View style={styles.resultDetailItem}>
               <Text style={styles.resultDetailLabel}>Çoktan Seçmeli:</Text>
               <Text style={styles.resultDetailValue}>
-                {quizAttempt?.multipleChoiceAnswers.filter((a: any) => a.isCorrect).length}/{quizAttempt?.multipleChoiceAnswers.length}
+                {Array.isArray(quizAttempt?.multipleChoiceAnswers) ? 
+                  `${quizAttempt.multipleChoiceAnswers.filter((a: any) => a.isCorrect).length || 0}/${quizAttempt.multipleChoiceAnswers.length}` : 
+                  '0/0'}
               </Text>
             </View>
             
             <View style={styles.resultDetailItem}>
               <Text style={styles.resultDetailLabel}>Kod Tamamlama:</Text>
               <Text style={styles.resultDetailValue}>
-                {quizAttempt?.codeCompletionAnswers.filter((a: any) => a.isCorrect).length}/{quizAttempt?.codeCompletionAnswers.length}
+                {Array.isArray(quizAttempt?.codeCompletionAnswers) ? 
+                  `${quizAttempt.codeCompletionAnswers.filter((a: any) => a.isCorrect).length || 0}/${quizAttempt.codeCompletionAnswers.length}` : 
+                  '0/0'}
               </Text>
             </View>
           </View>
@@ -226,29 +542,86 @@ const QuizResultScreen = ({ route, navigation }: any) => {
           <Text style={styles.sectionTitle}>Soru Detayları</Text>
           
           {/* Çoktan Seçmeli Sorular */}
-          {quizAttempt?.multipleChoiceAnswers.length > 0 && (
-            <FlatList
-              data={quizAttempt.multipleChoiceAnswers}
-              renderItem={renderMCQuestionResult}
-              keyExtractor={(item, index) => `mc-${index}`}
-              scrollEnabled={false}
-              ListHeaderComponent={quizAttempt.multipleChoiceAnswers.length > 0 ? (
-                <Text style={styles.questionTypeTitle}>Çoktan Seçmeli Sorular</Text>
-              ) : null}
-            />
-          )}
+          {Array.isArray(quizAttempt?.multipleChoiceAnswers) && quizAttempt.multipleChoiceAnswers.length > 0 ? (
+            <View style={styles.questionSection}>
+              <Text style={styles.questionTypeTitle}>Çoktan Seçmeli Sorular</Text>
+              <FlatList
+                data={quizAttempt.multipleChoiceAnswers}
+                renderItem={renderMCQuestionResult}
+                keyExtractor={(item, index) => `mc-${index}`}
+                scrollEnabled={false}
+                removeClippedSubviews={false}
+              />
+            </View>
+          ) : null}
           
           {/* Kod Tamamlama Soruları */}
-          {quizAttempt?.codeCompletionAnswers.length > 0 && (
-            <FlatList
-              data={quizAttempt.codeCompletionAnswers}
-              renderItem={renderCodeQuestionResult}
-              keyExtractor={(item, index) => `code-${index}`}
-              scrollEnabled={false}
-              ListHeaderComponent={quizAttempt.codeCompletionAnswers.length > 0 ? (
-                <Text style={styles.questionTypeTitle}>Kod Tamamlama Soruları</Text>
-              ) : null}
-            />
+          {Array.isArray(quizAttempt?.codeCompletionAnswers) && quizAttempt.codeCompletionAnswers.length > 0 ? (
+            <View style={styles.questionSection}>
+              <Text style={styles.questionTypeTitle}>Kod Tamamlama Soruları</Text>
+              <FlatList
+                data={quizAttempt.codeCompletionAnswers}
+                renderItem={renderCodeQuestionResult}
+                keyExtractor={(item, index) => `code-${index}`}
+                scrollEnabled={false}
+                removeClippedSubviews={false}
+              />
+            </View>
+          ) : null}
+          
+          {/* Fallback durumunda veya boş cevap dizileri durumunda bilgilendirme mesajı */}
+          {quizAttempt?.isFallback && (
+            <View style={styles.fallbackInfoContainer}>
+              <Text style={styles.fallbackInfoTitle}>Bilgilendirme</Text>
+              
+              {quizAttempt.errorType === '404' && (
+                <Text style={styles.fallbackInfoText}>
+                  Sınav sonuç detayları sunucuda bulunamadı (404 hatası). Özet bilgiler ve mevcut soru detayları gösteriliyor.
+                </Text>
+              )}
+              
+              {quizAttempt.errorType === 'timeout' && (
+                <Text style={styles.fallbackInfoText}>
+                  Sunucu yanıt vermedi (zaman aşımı). Özet bilgiler ve mevcut soru detayları gösteriliyor.
+                </Text>
+              )}
+              
+              {quizAttempt.parseError && (
+                <Text style={styles.fallbackInfoText}>
+                  Sunucudan gelen veri formatı geçersiz. Özet bilgiler ve mevcut soru detayları gösteriliyor.
+                </Text>
+              )}
+              
+              {(!quizAttempt.errorType || (quizAttempt.errorType !== '404' && quizAttempt.errorType !== 'timeout' && !quizAttempt.parseError)) && (
+                <Text style={styles.fallbackInfoText}>
+                  Sınav sonuç detayları yüklenirken bir hata oluştu. Özet bilgiler ve mevcut soru detayları gösteriliyor.
+                </Text>
+              )}
+              
+              <Text style={styles.fallbackInfoText}>
+                Bu durum genellikle sunucu bakımda olduğunda, internet bağlantınızda sorun olduğunda veya sınav sonuçları henüz işlenmediğinde oluşur.
+              </Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={loadResultDetails}
+              >
+                <Text style={styles.retryButtonText}>Tekrar Dene</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {(!Array.isArray(quizAttempt?.multipleChoiceAnswers) || quizAttempt.multipleChoiceAnswers.length === 0) && 
+           (!Array.isArray(quizAttempt?.codeCompletionAnswers) || quizAttempt.codeCompletionAnswers.length === 0) && 
+           !quizAttempt?.isFallback && (
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyStateText}>Detaylı soru sonuçları yüklenemedi.</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={loadResultDetails}
+              >
+                <Text style={styles.retryButtonText}>Tekrar Dene</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -280,6 +653,73 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#666',
+  },
+  emptyStateContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  fallbackInfoContainer: {
+    backgroundColor: '#fff8e1',
+    borderWidth: 1,
+    borderColor: '#ffd54f',
+    borderRadius: 8,
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 12,
+  },
+  fallbackInfoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#f57c00',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  fallbackInfoText: {
+    fontSize: 14,
+    color: '#5d4037',
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  userAnswerContainer: {
+    marginTop: 15,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+  },
+  userAnswerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  userAnswerText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  questionSection: {
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#6c5ce7',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 15,
+    alignSelf: 'center',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   header: {
     flexDirection: 'row',
@@ -610,4 +1050,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default QuizResultScreen; 
+export default QuizResultScreen;

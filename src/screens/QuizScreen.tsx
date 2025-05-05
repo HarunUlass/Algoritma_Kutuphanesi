@@ -257,6 +257,7 @@ const QuizScreen = ({ route, navigation }: any) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            quizId: quizId, // Quiz ID eklendi
             questionIndex: currentQuestionIndex,
             selectedOptions: selectedOptions,
           }),
@@ -289,6 +290,7 @@ const QuizScreen = ({ route, navigation }: any) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            quizId: quizId, // Quiz ID eklendi
             questionIndex: ccIndex,
             userCode: userCode,
           }),
@@ -337,6 +339,9 @@ const QuizScreen = ({ route, navigation }: any) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          quizId: quizId, // Quiz ID eklendi
+        }),
       });
       
       if (!response.ok) {

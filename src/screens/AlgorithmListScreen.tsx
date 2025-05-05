@@ -201,12 +201,163 @@ export const machineLearningSubCategories: SubCategoryMap = {
   ]
 };
 
+// Doğal Dil İşleme alt kategorileri ve algoritmaları
+export const nlpSubCategories: SubCategoryMap = {
+  'Tokenizasyon': [
+    {
+      id: '1',
+      title: 'Word Tokenization',
+      complexity: 'O(n)',
+      difficulty: 'Kolay',
+      description: 'Metni kelime birimlerine ayırma işlemi.',
+    },
+    {
+      id: '2',
+      title: 'Sentence Tokenization',
+      complexity: 'O(n)',
+      difficulty: 'Kolay',
+      description: 'Metni cümle birimlerine ayırma işlemi.',
+    }
+  ],
+  'Vektör Modeller': [
+    {
+      id: '1',
+      title: 'Word2Vec',
+      complexity: 'O(n)',
+      difficulty: 'Orta',
+      description: 'Kelimeleri vektör uzayında temsil eden model.',
+    },
+    {
+      id: '2',
+      title: 'GloVe',
+      complexity: 'O(n²)',
+      difficulty: 'Orta',
+      description: 'Global Vectors for Word Representation, kelime vektörlerini oluşturan model.',
+    },
+    {
+      id: '3',
+      title: 'FastText',
+      complexity: 'O(n)',
+      difficulty: 'Orta',
+      description: 'Karakter n-gramlarını kullanan kelime vektörü modeli.',
+    }
+  ],
+  'Duygu Analizi': [
+    {
+      id: '1',
+      title: 'Naive Bayes',
+      complexity: 'O(n)',
+      difficulty: 'Kolay',
+      description: 'Metinlerin duygusal tonunu belirlemek için kullanılan olasılıksal sınıflandırıcı.',
+    },
+    {
+      id: '2',
+      title: 'LSTM Duygu Analizi',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Uzun-Kısa Vadeli Bellek ağları kullanarak duygu analizi yapma.',
+    }
+  ],
+  'Makine Çevirisi': [
+    {
+      id: '1',
+      title: 'Seq2Seq',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Diziden diziye çeviri yapan sinir ağı mimarisi.',
+    },
+    {
+      id: '2',
+      title: 'Transformer',
+      complexity: 'O(n²)',
+      difficulty: 'Zor',
+      description: 'Dikkat mekanizması kullanan modern makine çevirisi mimarisi.',
+    }
+  ]
+};
+
+// Makine Görünümü alt kategorileri ve algoritmaları
+export const computerVisionSubCategories: SubCategoryMap = {
+  'Görüntü İşleme': [
+    {
+      id: '1',
+      title: 'Kenar Algılama',
+      complexity: 'O(n²)',
+      difficulty: 'Orta',
+      description: 'Görüntülerdeki kenarları tespit eden algoritmalar (Sobel, Canny vb.).',
+    },
+    {
+      id: '2',
+      title: 'Filtreleme',
+      complexity: 'O(n²)',
+      difficulty: 'Kolay',
+      description: 'Görüntülere çeşitli filtreler uygulama teknikleri.',
+    }
+  ],
+  'Nesne Tespiti': [
+    {
+      id: '1',
+      title: 'YOLO',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'You Only Look Once, gerçek zamanlı nesne tespiti algoritması.',
+    },
+    {
+      id: '2',
+      title: 'R-CNN',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Region-based Convolutional Neural Networks, bölge tabanlı nesne tespiti.',
+    },
+    {
+      id: '3',
+      title: 'SSD',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Single Shot Detector, tek geçişli nesne tespiti algoritması.',
+    }
+  ],
+  'Segmentasyon': [
+    {
+      id: '1',
+      title: 'U-Net',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Biyomedikal görüntü segmentasyonu için geliştirilen CNN mimarisi.',
+    },
+    {
+      id: '2',
+      title: 'Mask R-CNN',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Nesne tespiti ve instance segmentasyonu birleştiren model.',
+    }
+  ],
+  '3D Görüntüleme': [
+    {
+      id: '1',
+      title: 'PointNet',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: '3D nokta bulutları üzerinde çalışan derin öğrenme mimarisi.',
+    },
+    {
+      id: '2',
+      title: 'SLAM',
+      complexity: 'O(n²)',
+      difficulty: 'Zor',
+      description: 'Eşzamanlı Lokalizasyon ve Haritalama, robotik ve AR uygulamalarında kullanılır.',
+    }
+  ]
+};
+
 // Tüm kategorileri ve alt kategorileri birleştiren nesne
 export const allCategories: CategoryMap = {
   '1': dataStructuresSubCategories,
   '2': deepLearningSubCategories,
   '3': machineLearningSubCategories,
-  // Diğer kategoriler eklenebilir
+  '4': nlpSubCategories,
+  '5': computerVisionSubCategories
 };
 
 const difficultyColors: {[key: string]: string} = {
@@ -425,4 +576,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AlgorithmListScreen; 
+export default AlgorithmListScreen;

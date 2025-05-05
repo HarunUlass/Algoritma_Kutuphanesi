@@ -781,8 +781,66 @@ app.post('/api/quiz-attempts/:attemptId/multiple-choice', async (req, res) => {
     const { attemptId } = req.params;
     const { questionIndex, selectedOptions } = req.body;
     
-    // Girişimin var olup olmadığını kontrol et
-    const attempt = await QuizAttempt.findById(attemptId);
+    // Geçici ID kontrolü (misafir kullanıcı için)
+    if (attemptId.startsWith('temp_')) {
+      // Misafir kullanıcı için doğrudan quiz bilgilerini getir
+      const quizId = req.body.quizId; // İstek gövdesinden quiz ID'sini al
+      
+      if (!quizId) {
+        return res.status(400).json({
+          error: 'Quiz ID gereklidir'
+        });
+      }
+      
+      // MongoDB ObjectId formatını kontrol et
+      let quiz;
+      try {
+        quiz = await Quiz.findById(quizId);
+      } catch (err) {
+        console.error('Geçersiz Quiz ID formatı:', err);
+        return res.status(400).json({
+          error: 'Geçersiz Quiz ID formatı'
+        });
+      }
+      
+      if (!quiz || !quiz.multipleChoiceQuestions[questionIndex]) {
+        return res.status(404).json({
+          error: 'Quiz veya soru bulunamadı'
+        });
+      }
+      
+      // Soruyu ve doğru cevapları al
+      const question = quiz.multipleChoiceQuestions[questionIndex];
+      const correctOptionIndices = question.options
+        .map((option, index) => option.isCorrect ? index : null)
+        .filter(index => index !== null);
+      
+      // Cevabın doğruluğunu kontrol et
+      const isCorrect = selectedOptions.length === correctOptionIndices.length &&
+        selectedOptions.every(index => correctOptionIndices.includes(index));
+      
+      // Her soru 10 puan değerinde
+      const pointsEarned = isCorrect ? 10 : 0;
+      
+      return res.json({
+        isCorrect,
+        pointsEarned,
+        explanation: isCorrect 
+          ? question.options.find(o => o.isCorrect)?.explanation 
+          : question.options.filter((_, i) => selectedOptions.includes(i)).map(o => o.explanation).join(' ')
+      });
+    }
+    
+    // Kayıtlı kullanıcı için normal işlem
+    let attempt;
+    try {
+      attempt = await QuizAttempt.findById(attemptId);
+    } catch (err) {
+      console.error('Geçersiz Attempt ID formatı:', err);
+      return res.status(400).json({
+        error: 'Geçersiz Quiz Girişimi ID formatı'
+      });
+    }
     
     if (!attempt) {
       return res.status(404).json({
@@ -860,8 +918,64 @@ app.post('/api/quiz-attempts/:attemptId/code-completion', async (req, res) => {
     const { attemptId } = req.params;
     const { questionIndex, userCode } = req.body;
     
-    // Girişimin var olup olmadığını kontrol et
-    const attempt = await QuizAttempt.findById(attemptId);
+    // Geçici ID kontrolü (misafir kullanıcı için)
+    if (attemptId.startsWith('temp_')) {
+      // Misafir kullanıcı için doğrudan quiz bilgilerini getir
+      const quizId = req.body.quizId; // İstek gövdesinden quiz ID'sini al
+      
+      if (!quizId) {
+        return res.status(400).json({
+          error: 'Quiz ID gereklidir'
+        });
+      }
+      
+      // MongoDB ObjectId formatını kontrol et
+      let quiz;
+      try {
+        quiz = await Quiz.findById(quizId);
+      } catch (err) {
+        console.error('Geçersiz Quiz ID formatı:', err);
+        return res.status(400).json({
+          error: 'Geçersiz Quiz ID formatı'
+        });
+      }
+      
+      if (!quiz || !quiz.codeCompletionQuestions[questionIndex]) {
+        return res.status(404).json({
+          error: 'Quiz veya soru bulunamadı'
+        });
+      }
+      
+      // Soruyu al
+      const question = quiz.codeCompletionQuestions[questionIndex];
+      
+      // Basit bir kod doğrulama: çözüm kullanıcı kodunda var mı?
+      const solution = question.solution.trim();
+      const normalizedUserCode = userCode.trim();
+      const isCorrect = normalizedUserCode.includes(solution);
+      
+      // Kod tamamlama soruları 20 puan değerinde
+      const pointsEarned = isCorrect ? 20 : 0;
+      
+      return res.json({
+        isCorrect,
+        pointsEarned,
+        feedback: isCorrect 
+          ? 'Harika! Doğru çözümü buldunuz.' 
+          : `Çözümünüz doğru değil. İpucu: ${question.hints[0]}`
+      });
+    }
+    
+    // Kayıtlı kullanıcı için normal işlem
+    let attempt;
+    try {
+      attempt = await QuizAttempt.findById(attemptId);
+    } catch (err) {
+      console.error('Geçersiz Attempt ID formatı:', err);
+      return res.status(400).json({
+        error: 'Geçersiz Quiz Girişimi ID formatı'
+      });
+    }
     
     if (!attempt) {
       return res.status(404).json({
@@ -938,8 +1052,65 @@ app.post('/api/quiz-attempts/:attemptId/finish', async (req, res) => {
   try {
     const { attemptId } = req.params;
     
-    // Girişimin var olup olmadığını kontrol et
-    const attempt = await QuizAttempt.findById(attemptId);
+    // Geçici ID kontrolü (misafir kullanıcı için)
+    if (attemptId.startsWith('temp_')) {
+      // Misafir kullanıcı için doğrudan sonuçları hesapla
+      const { quizId, multipleChoiceAnswers = [], codeCompletionAnswers = [] } = req.body;
+      
+      if (!quizId) {
+        return res.status(400).json({
+          error: 'Quiz ID gereklidir'
+        });
+      }
+      
+      // MongoDB ObjectId formatını kontrol et
+      let quiz;
+      try {
+        quiz = await Quiz.findById(quizId);
+      } catch (err) {
+        console.error('Geçersiz Quiz ID formatı:', err);
+        return res.status(400).json({
+          error: 'Geçersiz Quiz ID formatı'
+        });
+      }
+      
+      if (!quiz) {
+        return res.status(404).json({
+          error: 'Quiz bulunamadı'
+        });
+      }
+      
+      // Toplam puanları hesapla
+      let totalEarned = 0;
+      
+      // Çoktan seçmeli sorular için puanları topla
+      multipleChoiceAnswers.forEach(answer => {
+        totalEarned += answer.isCorrect ? 10 : 0;
+      });
+      
+      // Kod tamamlama soruları için puanları topla
+      codeCompletionAnswers.forEach(answer => {
+        totalEarned += answer.isCorrect ? 20 : 0;
+      });
+      
+      // Sonuçları döndür
+      return res.json({
+        score: totalEarned,
+        totalPossible: quiz.totalPoints,
+        passed: totalEarned >= quiz.passingScore
+      });
+    }
+    
+    // Kayıtlı kullanıcı için normal işlem
+    let attempt;
+    try {
+      attempt = await QuizAttempt.findById(attemptId);
+    } catch (err) {
+      console.error('Geçersiz Attempt ID formatı:', err);
+      return res.status(400).json({
+        error: 'Geçersiz Quiz Girişimi ID formatı'
+      });
+    }
     
     if (!attempt) {
       return res.status(404).json({
@@ -1856,4 +2027,4 @@ app.get('/api/users/:userId/notes', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server ${PORT} portunda çalışıyor`);
-}); 
+});
