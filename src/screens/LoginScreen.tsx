@@ -25,7 +25,7 @@ const LoginScreen = ({ navigation }: any) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { setIsLoggedIn, setUsername: setContextUsername, setUserId } = useContext(AuthContext);
+  const { setIsLoggedIn, setUsername: setContextUsername, setUserId, saveAuthState } = useContext(AuthContext);
   const [logoSource, setLogoSource] = useState(null);
 
   useEffect(() => {
@@ -63,14 +63,41 @@ const LoginScreen = ({ navigation }: any) => {
       });
 
       const data = await response.json();
+      console.log('Giriş yanıtı:', JSON.stringify(data));
 
       if (!response.ok) {
         throw new Error(data.error);
       }
 
-      setIsLoggedIn(true);
+      let userId = data.id;
+      if (!userId) {
+        console.warn('Uyarı: Sunucudan kullanıcı ID bilgisi alınamadı');
+        // Kullanıcı ID'si almak için ekstra bir API çağrısı yap
+        try {
+          const userResponse = await fetch(`${API_BASE_URL}/users/by-email/${email}`);
+          const userData = await userResponse.json();
+          
+          if (userResponse.ok && userData.id) {
+            console.log('Kullanıcı ID alındı:', userData.id);
+            userId = userData.id;
+          } else {
+            console.error('Kullanıcı ID alınamadı:', userData.error || 'Bilinmeyen hata');
+            Alert.alert('Uyarı', 'Kullanıcı kimliği alınamadı. Bazı özellikler çalışmayabilir.');
+          }
+        } catch (error) {
+          console.error('Kullanıcı ID alınamadı:', error);
+        }
+      } else {
+        console.log('Kullanıcı ID başarıyla alındı:', data.id);
+      }
+
+      setUserId(userId);
       setContextUsername(data.username);
-      setUserId(data.userId);
+      setIsLoggedIn(true);
+      
+      // Kimlik bilgilerini kaydet
+      await saveAuthState();
+      
       navigation.navigate('Home');
     } catch (error) {
       const err = error as ApiError;
@@ -112,15 +139,42 @@ const LoginScreen = ({ navigation }: any) => {
       });
 
       const data = await response.json();
+      console.log('Kayıt yanıtı:', JSON.stringify(data));
 
       if (!response.ok) {
         throw new Error(data.error);
       }
 
+      let userId = data.id;
+      if (!userId) {
+        console.warn('Uyarı: Sunucudan kullanıcı ID bilgisi alınamadı');
+        // Kullanıcı ID'si almak için ekstra bir API çağrısı yap
+        try {
+          const userResponse = await fetch(`${API_BASE_URL}/users/by-email/${email}`);
+          const userData = await userResponse.json();
+          
+          if (userResponse.ok && userData.id) {
+            console.log('Kullanıcı ID alındı:', userData.id);
+            userId = userData.id;
+          } else {
+            console.error('Kullanıcı ID alınamadı:', userData.error || 'Bilinmeyen hata');
+            Alert.alert('Uyarı', 'Kullanıcı kimliği alınamadı. Bazı özellikler çalışmayabilir.');
+          }
+        } catch (error) {
+          console.error('Kullanıcı ID alınamadı:', error);
+        }
+      } else {
+        console.log('Kullanıcı ID başarıyla alındı:', data.id);
+      }
+
       // Kayıt başarılı, otomatik giriş yap
-      setIsLoggedIn(true);
+      setUserId(userId);
       setContextUsername(username);
-      setUserId(data.userId);
+      setIsLoggedIn(true);
+      
+      // Kimlik bilgilerini kaydet
+      await saveAuthState();
+      
       navigation.navigate('Home');
     } catch (error) {
       const err = error as ApiError;

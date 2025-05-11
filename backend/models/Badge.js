@@ -11,7 +11,8 @@ const badgeSchema = new mongoose.Schema({
       'LEARNER', // İlk kez bir algoritma görüntülemek
       'GRADUATE', // Bir öğrenme yolunu tamamlamak
       'CONTRIBUTOR', // Katkıda bulunmak (yorum yapmak, değerlendirme yapmak)
-      'EXPLORER' // Tüm algoritma kategorilerinden en az bir algoritma görüntülemek
+      'EXPLORER', // Tüm algoritma kategorilerinden en az bir algoritma görüntülemek
+      'QUIZ_MASTER' // Bir quizi ilk kez başarıyla tamamlamak
     ],
     required: true,
     unique: true
@@ -121,6 +122,17 @@ async function initializeBadges() {
             uniqueCategories: 5
           },
           level: 2
+        },
+        {
+          type: 'QUIZ_MASTER',
+          name: 'Quiz Ustası',
+          description: 'İlk kez bir quizi başarıyla tamamladınız!',
+          icon: 'quiz_master',
+          xpReward: 50,
+          requirement: { 
+            quizPassed: 1
+          },
+          level: 1
         }
       ];
       
