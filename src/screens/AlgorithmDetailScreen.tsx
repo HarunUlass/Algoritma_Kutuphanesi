@@ -10,6 +10,8 @@ import {
   Alert,
 } from 'react-native';
 import { AuthContext } from '../../App';
+import AlgorithmVisualization from '../components/AlgorithmVisualization';
+import GraphVisualization from '../components/GraphVisualization';
 
 // API URL
 const API_URL = 'http://10.0.2.2:3000/api'; // Android Emulator için localhost
@@ -454,18 +456,33 @@ const AlgorithmDetailScreen = ({ route, navigation }: any) => {
 
         {activeTab === 'visual' && (
           <View style={styles.visualContainer}>
-            <View style={styles.visualPlaceholder}>
-              <Text style={styles.visualPlaceholderText}>
-                {algorithm.title} Görselleştirmesi
-              </Text>
-              <Text style={styles.visualDescription}>
-                Bu bölümde {algorithm.title} algoritmasının interaktif bir görselleştirmesi olacak.
-                Kullanıcılar algoritmanın nasıl çalıştığını adım adım görebilecekler.
-              </Text>
-              <View style={styles.comingSoonBadge}>
-                <Text style={styles.comingSoonText}>Yakında</Text>
+            {/* Algoritma tipine göre uygun görselleştirme bileşenini göster */}
+            {['dijkstra', 'breadth first search', 'depth first search'].includes(algorithm.title.toLowerCase()) ? (
+              <GraphVisualization 
+                algorithmType={algorithm.title}
+                title={algorithm.title}
+                animationSpeed={1000}
+              />
+            ) : ['bubble sort', 'merge sort', 'quick sort', 'insertion sort', 'binary search'].includes(algorithm.title.toLowerCase()) ? (
+              <AlgorithmVisualization 
+                algorithmType={algorithm.title}
+                title={algorithm.title}
+                animationSpeed={500}
+              />
+            ) : (
+              <View style={styles.visualPlaceholder}>
+                <Text style={styles.visualPlaceholderText}>
+                  {algorithm.title} Görselleştirmesi
+                </Text>
+                <Text style={styles.visualDescription}>
+                  Bu algoritma için henüz görselleştirme eklenmemiştir.
+                  En yaygın algoritmalar için görselleştirmeler mevcuttur.
+                </Text>
+                <View style={styles.comingSoonBadge}>
+                  <Text style={styles.comingSoonText}>Yakında</Text>
+                </View>
               </View>
-            </View>
+            )}
           </View>
         )}
       </ScrollView>
