@@ -192,9 +192,9 @@ const AlgorithmVisualization: React.FC<ArrayVisualizationProps> = ({
       if (!barColors.current || !barColors.current[index]) {
         console.warn(`animateColor: Geçersiz index (${index}) veya barColors hazır değil`);
         resolve(); // İşlemi sonlandır
-      return;
-    }
-    
+        return;
+      }
+      
       Animated.timing(barColors.current[index], {
         toValue: colorValue,
         duration,
@@ -208,8 +208,8 @@ const AlgorithmVisualization: React.FC<ArrayVisualizationProps> = ({
   // Bubble Sort algoritması için görselleştirme
   const visualizeBubbleSort = async () => {
     if (sorting) return;
-      setSorting(true);
-      setCurrentStep(0);
+    setSorting(true);
+    setCurrentStep(0);
     
     try {
       const newArray = [...array];
@@ -299,7 +299,7 @@ const AlgorithmVisualization: React.FC<ArrayVisualizationProps> = ({
               (barColors.current[i] as any).__getValue() !== 3) {
             await animateColor(i, 3, 100);
           }
-    } catch (error) {
+        } catch (error) {
           // Hata oluşursa tüm elemanları sıralanmış olarak işaretlemeye devam et
           await animateColor(i, 3, 100);
         }
@@ -445,8 +445,8 @@ const AlgorithmVisualization: React.FC<ArrayVisualizationProps> = ({
   // Merge Sort algoritması için görselleştirme
   const visualizeMergeSort = async () => {
     if (sorting) return;
-      setSorting(true);
-      setCurrentStep(0);
+    setSorting(true);
+    setCurrentStep(0);
     
     const arr = [...array];
     const n = arr.length;
@@ -584,7 +584,7 @@ const AlgorithmVisualization: React.FC<ArrayVisualizationProps> = ({
     }
     
     setExplanationText('Merge Sort tamamlandı! Dizi sıralandı.');
-      setSorting(false);
+    setSorting(false);
   };
   
   // Quick Sort algoritması için görselleştirme
@@ -1358,32 +1358,32 @@ const AlgorithmVisualization: React.FC<ArrayVisualizationProps> = ({
       
       <ScrollView horizontal style={styles.visualizationContainer}>
         <View style={styles.barContainer}>
-                    {array.map((value, index) => (
-                        <Animated.View
+          {array.map((value, index) => (
+            <Animated.View
               key={`bar-${index}`}
-                          style={[
+              style={[
                 styles.bar,
-                            {
+                {
                   height: (value / 100) * MAX_BAR_HEIGHT,
-                              backgroundColor: getBarColor(index),
-                              transform: [{ translateX: barRefs.current && barRefs.current[index] ? barRefs.current[index] : new Animated.Value(0) }],
-                            },
-                          ]}
-                        >
+                  backgroundColor: getBarColor(index),
+                  transform: [{ translateX: barRefs.current && barRefs.current[index] ? barRefs.current[index] : new Animated.Value(0) }],
+                },
+              ]}
+            >
               <Text style={styles.barText}>{value}</Text>
-                        </Animated.View>
+            </Animated.View>
           ))}
-            </View>
-          </ScrollView>
-          
+        </View>
+      </ScrollView>
+      
       <View style={styles.explanationContainer}>
-            <Text style={styles.explanationText}>{explanationText}</Text>
-            {totalSteps > 0 && (
-              <Text style={styles.stepCounter}>
-                Adım: {currentStep} / {totalSteps}
-              </Text>
-            )}
-          </View>
+        <Text style={styles.explanationText}>{explanationText}</Text>
+        {totalSteps > 0 && (
+          <Text style={styles.stepCounter}>
+            Adım: {currentStep} / {totalSteps}
+          </Text>
+        )}
+      </View>
     </View>
   );
 };

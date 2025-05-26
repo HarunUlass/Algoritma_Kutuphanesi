@@ -42,6 +42,8 @@ backend/.env
 node_modules/
 npm-debug.log
 yarn-error.log
+web örnek 
+
 
 # fastlane
 #

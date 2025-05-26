@@ -52,13 +52,27 @@ export const dataStructuresSubCategories: SubCategoryMap = {
     },
     {
       id: '4',
+      title: 'Selection Sort',
+      complexity: 'O(n²)',
+      difficulty: 'Kolay',
+      description: 'Her adımda dizideki en küçük elemanı bulup doğru konuma yerleştiren bir sıralama algoritmasıdır.',
+    },
+    {
+      id: '5',
+      title: 'Insertion Sort',
+      complexity: 'O(n²)',
+      difficulty: 'Kolay',
+      description: 'Diziyi tek tek eleman ekleyerek sıralayan, küçük veri setleri için etkili bir sıralama algoritmasıdır.',
+    },
+    {
+      id: '6',
       title: 'Quick Sort',
       complexity: 'O(n log n)',
       difficulty: 'Orta',
       description: 'Böl ve fethet stratejisini kullanarak hızlı sıralama yapar.',
     },
     {
-      id: '5',
+      id: '7',
       title: 'Merge Sort',
       complexity: 'O(n log n)',
       difficulty: 'Orta',
@@ -129,6 +143,13 @@ export const deepLearningSubCategories: SubCategoryMap = {
       complexity: 'O(n²)',
       difficulty: 'Orta',
       description: 'Sinir ağlarında hata geri yayılım algoritması.',
+    },
+    {
+      id: '3',
+      title: 'Geri Yayılım Algoritması',
+      complexity: 'O(n²)',
+      difficulty: 'Zor',
+      description: 'Yapay sinir ağlarının eğitiminde kullanılan gradyan tabanlı bir optimizasyon algoritmasıdır.',
     }
   ],
   'CNN': [
@@ -181,12 +202,40 @@ export const machineLearningSubCategories: SubCategoryMap = {
       complexity: 'O(n log n)',
       difficulty: 'Orta',
       description: 'Veri özelliklerine göre karar kuralları oluşturan model.',
+    },
+    {
+      id: '4',
+      title: 'Destek Vektör Makineleri',
+      complexity: 'O(n²)',
+      difficulty: 'Zor',
+      description: 'Veri noktalarını ayıran optimum hiper düzlemi bulmaya çalışan bir sınıflandırma algoritmasıdır.',
+    },
+    {
+      id: '5',
+      title: 'KNN (K-Nearest Neighbors)',
+      complexity: 'O(n)',
+      difficulty: 'Kolay',
+      description: 'K-En Yakın Komşu algoritması. Yeni bir veri noktasını en yakın k komşusunun sınıfına göre sınıflandırır.',
+    },
+    {
+      id: '6',
+      title: 'Naive Bayes',
+      complexity: 'O(n)',
+      difficulty: 'Kolay',
+      description: 'Bayes teoremini kullanan olasılıksal sınıflandırma algoritması. Özellikler arasında bağımsızlık varsayımı yapar.',
+    },
+    {
+      id: '7',
+      title: 'Random Forest',
+      complexity: 'O(n log n)',
+      difficulty: 'Orta',
+      description: 'Rastgele Orman algoritması. Çoklu karar ağaçlarının oylaması ile sınıflandırma yapan topluluk öğrenme yöntemidir.',
     }
   ],
   'Denetimsiz Öğrenme': [
     {
       id: '1',
-      title: 'K-Means',
+      title: 'K-Means Kümeleme',
       complexity: 'O(k*n*t)',
       difficulty: 'Orta',
       description: 'Verileri K adet kümeye ayıran kümeleme algoritması.',
@@ -197,6 +246,78 @@ export const machineLearningSubCategories: SubCategoryMap = {
       complexity: 'O(n³)',
       difficulty: 'Orta',
       description: 'Temel Bileşen Analizi, boyut indirgeme tekniği.',
+    },
+    {
+      id: '3',
+      title: 'Hierarchical Clustering',
+      complexity: 'O(n³)',
+      difficulty: 'Orta',
+      description: 'Hiyerarşik kümeleme algoritması. Verileri ağaç yapısında (dendrogram) kümelere ayırır.',
+    },
+    {
+      id: '4',
+      title: 'Association Rule Learning',
+      complexity: 'O(n²)',
+      difficulty: 'Orta',
+      description: 'Birliktelik kuralları öğrenme. Veri setindeki öğeler arasındaki ilişkileri keşfeder (Market sepeti analizi gibi).',
+    },
+    {
+      id: '5',
+      title: 'Autoencoders',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Otokodlayıcılar. Girdi verilerini sıkıştırıp yeniden oluşturan sinir ağı mimarisi. Boyut indirgeme ve özellik öğrenmede kullanılır.',
+    }
+  ],
+  'Pekiştirmeli Öğrenme': [
+    {
+      id: '1',
+      title: 'Q-Öğrenme (Q-Learning)',
+      complexity: 'O(|S|×|A|)',
+      difficulty: 'Orta',
+      description: 'Model-free pekiştirmeli öğrenme algoritması. Ajanın optimal eylem-değer fonksiyonunu öğrenmesini sağlar.',
+    },
+    {
+      id: '2',
+      title: 'SARSA (State-Action-Reward-State-Action)',
+      complexity: 'O(|S|×|A|)',
+      difficulty: 'Orta',
+      description: 'On-policy temporal difference öğrenme algoritması. Mevcut politikayı takip ederek Q-değerlerini günceller.',
+    },
+    {
+      id: '3',
+      title: 'REINFORCE',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Policy gradient yöntemlerinin temel algoritması. Politika parametrelerini doğrudan optimize eder.',
+    },
+    {
+      id: '4',
+      title: 'Aktör-Kritik (Actor-Critic)',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Value-based ve policy-based yöntemleri birleştiren hibrit algoritma. Aktör politikayı, kritik değer fonksiyonunu öğrenir.',
+    },
+    {
+      id: '5',
+      title: 'Proximal Policy Optimization (PPO)',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Policy gradient algoritmalarının gelişmiş versiyonu. Güvenli ve kararlı politika güncellemeleri sağlar.',
+    },
+    {
+      id: '6',
+      title: 'Deep Q-Network (DQN)',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Q-Learning algoritmasının derin sinir ağları ile birleştirilmiş hali. Karmaşık durum uzayları için uygun.',
+    },
+    {
+      id: '7',
+      title: 'Soft Actor-Critic (SAC)',
+      complexity: 'Değişken',
+      difficulty: 'Zor',
+      description: 'Maximum entropy framework kullanan off-policy aktör-kritik algoritması. Sürekli eylem uzayları için optimize edilmiştir.',
     }
   ]
 };

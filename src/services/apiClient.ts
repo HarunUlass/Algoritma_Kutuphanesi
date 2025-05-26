@@ -173,8 +173,82 @@ export const api = {
       if (!userId) {
         throw new Error('Geçersiz kullanıcı ID: tanımlı değil');
       }
-      const response = await fetchWithRetry(`${API_BASE_URL}/users/${userId}/quiz-stats`);
-      return await response.json();
+      try {
+        console.log(`Quiz istatistikleri alınıyor: ${API_BASE_URL}/users/${userId}/quiz-stats`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/users/${userId}/quiz-stats`);
+        
+        if (!response.ok) {
+          console.error(`Quiz istatistikleri alınamadı: ${response.status}`);
+          
+          // Detaylı hata bilgisi için response içeriğini yazdır
+          try {
+            const errorText = await response.text();
+            console.error('API hata detayı:', errorText);
+          } catch (readError) {
+            console.error('Hata detayı okunamadı');
+          }
+          
+          // Hata durumunda varsayılan veri döndür
+          return {
+            totalAttempts: 0,
+            passedQuizzes: 0,
+            averageScore: 0,
+            recentAttempts: []
+          };
+        }
+        
+        const data = await response.json();
+        console.log('Quiz istatistikleri başarıyla alındı:', JSON.stringify(data).substring(0, 100) + '...');
+        
+        // Ensure recentAttempts is always an array
+        if (!data.recentAttempts) {
+          data.recentAttempts = [];
+        }
+        return data;
+      } catch (error) {
+        console.error('Quiz istatistikleri alınamadı (catch bloğu):', error);
+        // Hata durumunda varsayılan veri döndür
+        return {
+          totalAttempts: 0,
+          passedQuizzes: 0,
+          averageScore: 0,
+          recentAttempts: []
+        };
+      }
+    },
+    
+    // Kullanıcının quiz girişimlerini doğrudan getir - quiz-stats yerine kullanılabilir
+    getQuizAttempts: async (userId: string) => {
+      if (!userId) {
+        throw new Error('Geçersiz kullanıcı ID: tanımlı değil');
+      }
+      try {
+        console.log(`Quiz girişimleri alınıyor: ${API_BASE_URL}/users/${userId}/quiz-attempts`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/users/${userId}/quiz-attempts`);
+        
+        if (!response.ok) {
+          
+          
+          // Detaylı hata bilgisi için response içeriğini yazdır
+          try {
+            const errorText = await response.text();
+            
+          } catch (readError) {
+            console.error('Hata detayı okunamadı');
+          }
+          
+          // Hata durumunda boş dizi döndür
+          return [];
+        }
+        
+        const data = await response.json();
+        console.log('Quiz girişimleri başarıyla alındı:', JSON.stringify(data).substring(0, 100) + '...');
+        return data;
+      } catch (error) {
+        console.error('Quiz girişimleri alınamadı (catch bloğu):', error);
+        // Hata durumunda boş dizi döndür
+        return [];
+      }
     },
     
     getProgress: async (userId: string) => {

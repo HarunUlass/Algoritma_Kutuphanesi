@@ -378,28 +378,17 @@ const QuizResultScreen = ({ route, navigation }: any) => {
           
               <TouchableOpacity 
               style={[styles.button, styles.primaryButton]}
-              onPress={async () => {
-                if (quiz.algorithmId) {
-                  try {
-                    const algorithm = await fetchAlgorithmById(quiz.algorithmId);
-                    if (algorithm) {
-                      navigation.navigate('AlgorithmDetail', { algorithm });
-                    } else {
-                      Alert.alert('Hata', 'Algoritma detayları yüklenemedi.');
-                      navigation.navigate('Home');
-                    }
-                  } catch (error) {
-                    console.error('Algorithm navigation error:', error);
-                    Alert.alert('Hata', 'Bir sorun oluştu.');
-                    navigation.navigate('Home');
-                  }
+              onPress={() => {
+                // Redirect to the quiz list or retake the current quiz
+                if (quiz && quiz._id) {
+                  navigation.navigate('Quiz', { quizId: quiz._id });
                 } else {
                   navigation.navigate('Home');
                 }
               }}
             >
               <Text style={[styles.buttonText, styles.primaryButtonText]}>
-                Algoritmaya Git
+                Yeniden Dene
               </Text>
               </TouchableOpacity>
         </View>

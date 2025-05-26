@@ -1,0 +1,3188 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  ScrollView,
+  Dimensions,
+  TextInput,
+  Alert,
+} from 'react-native';
+import { AlgorithmInfoCard } from './VisualizationHelpers';
+
+// Farklı algoritmaların görselleştirmeleri için veri tipleri
+interface ArrayVisualizationProps {
+  algorithmType: string;
+  title: string;
+  animationSpeed?: number; // Milisaniye cinsinden animasyon hızı
+  customArray?: number[]; // İsteğe bağlı özel dizi
+}
+
+// Sabitleri tanımla
+const BAR_WIDTH = 30;
+const BAR_MARGIN = 5;
+const MAX_BAR_HEIGHT = 200;
+const DEFAULT_ANIMATION_SPEED = 500; // ms
+
+// Rastgele bir dizi oluşturmak için fonksiyon
+const generateRandomArray = (length: number, maxValue: number): number[] => {
+  return Array.from({ length }, () => Math.floor(Math.random() * maxValue) + 10);
+};
+
+// Algoritma Görselleştirme bileşeni
+const AlgorithmVisualization: React.FC<ArrayVisualizationProps> = ({
+  algorithmType,
+  title,
+  animationSpeed = DEFAULT_ANIMATION_SPEED,
+  customArray,
+}) => {
+  // Ekran genişliği ölçümü
+  const windowWidth = Dimensions.get('window').width;
+  
+  // Bağlı liste tiplerini kontrol et
+  const isLinkedList = algorithmType.toLowerCase().includes('linked') || 
+                      algorithmType.toLowerCase().includes('bağlı liste') || 
+                      algorithmType.toLowerCase().includes('dairesel');
+  
+  // Durumları tanımla
+  const [array, setArray] = useState<number[]>(() => {
+    // Eğer bağlı liste ise varsayılan değerlerle başla
+    if (isLinkedList) {
+      if (customArray && customArray.length > 0) {
+        return customArray;
+      }
+      return [42, 18, 27, 35, 53]; // Bağlı listeler için özel başlangıç değerleri
+    }
+    return customArray || generateRandomArray(8, 100);
+  });
+  
+  const [sorting, setSorting] = useState<boolean>(false);
+  const [currentStep, setCurrentStep] = useState<number>(0);
+  const [totalSteps, setTotalSteps] = useState<number>(0);
+  const [speed, setSpeed] = useState<number>(animationSpeed);
+  const [explanationText, setExplanationText] = useState<string>('Görselleştirmeyi başlatmak için "Başlat" düğmesine tıklayın.');
+  const [searchTarget, setSearchTarget] = useState<string>('');
+  
+  // Bağlı liste için ek state'ler
+  const [selectedOperation, setSelectedOperation] = useState<string>('demo'); // Seçilen işlem
+  const [inputValue, setInputValue] = useState<string>(''); // İşlem için girdi değeri
+  const [insertPosition, setInsertPosition] = useState<string>(''); // Ekleme pozisyonu
+  const [logMessages, setLogMessages] = useState<string[]>([]); // İşlem günlüğü
+  
+  // Animasyon değerlerini tut
+  const barRefs = useRef<Animated.Value[]>([]);
+  const barColors = useRef<Animated.Value[]>([]);
+  
+  // Animasyon renklerini ayarlamak için yardımcı fonksiyonlar
+  const normalColor = 'rgb(108, 92, 231)'; // Mor
+  const comparingColor = 'rgb(255, 165, 0)'; // Turuncu
+  const swappingColor = 'rgb(255, 0, 0)'; // Kırmızı
+  const sortedColor = 'rgb(46, 213, 115)'; // Yeşil
+  
+  // Bağlı listeler için ek renkler
+  const prevColor = 'rgb(52, 152, 219)'; // Mavi - previous
+  const nextColor = 'rgb(230, 126, 34)'; // Turuncu - next
+  const circularColor = 'rgb(155, 89, 182)'; // Mor - dairesel bağlantı
+  const visitedColor = 'rgb(149, 165, 166)'; // Gri - ziyaret edilmiş
+  
+  // Her dizinin değişiminde animasyon değerlerini yenile
+  useEffect(() => {
+    // Önceki referansları temizle
+    barRefs.current = [];
+    barColors.current = [];
+    
+    try {
+      // Her eleman için yeni animasyon değerleri oluştur
+      array.forEach(() => {
+        barRefs.current.push(new Animated.Value(0));
+        barColors.current.push(new Animated.Value(0));
+      });
+      
+      // Başlangıçta tüm barları normal renge ayarla
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(0); // 0 = normal renk
+      });
+      
+      // Algoritma tipine göre başlangıç açıklaması
+      if (algorithmType.toLowerCase().includes('singly')) {
+        setExplanationText('Tek Yönlü Bağlı Liste: İşlem seçin ve "Başlat" düğmesine tıklayın.');
+      } else if (algorithmType.toLowerCase().includes('doubly')) {
+        setExplanationText('Çift Yönlü Bağlı Liste: İşlem seçin ve "Başlat" düğmesine tıklayın.');
+      } else if (algorithmType.toLowerCase().includes('circular')) {
+        setExplanationText('Dairesel Bağlı Liste: İşlem seçin ve "Başlat" düğmesine tıklayın.');
+      } else {
+        setExplanationText('Görselleştirmeyi başlatmak için "Başlat" düğmesine tıklayın.');
+      }
+    } catch (error) {
+      console.error('Animasyon değerlerini başlatırken hata:', error);
+    }
+  }, [array, algorithmType]);
+  
+  // Yeni bir rastgele dizi oluştur
+  const resetArray = () => {
+    if (sorting) return; // Sıralama işlemi sırasında yeni dizi oluşturma
+    setArray(generateRandomArray(8, 100));
+    setCurrentStep(0);
+    setTotalSteps(0);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    // Algoritma tipine göre başlangıç açıklaması
+    if (algorithmType.toLowerCase().includes('singly')) {
+      setExplanationText('Tek Yönlü Bağlı Liste: İşlem seçin ve "Başlat" düğmesine tıklayın.');
+    } else if (algorithmType.toLowerCase().includes('doubly')) {
+      setExplanationText('Çift Yönlü Bağlı Liste: İşlem seçin ve "Başlat" düğmesine tıklayın.');
+    } else if (algorithmType.toLowerCase().includes('circular')) {
+      setExplanationText('Dairesel Bağlı Liste: İşlem seçin ve "Başlat" düğmesine tıklayın.');
+    } else {
+    setExplanationText('Görselleştirmeyi başlatmak için "Başlat" düğmesine tıklayın.');
+    }
+  };
+  
+  // İşlem günlüğüne mesaj ekle
+  const addLogMessage = (message: string) => {
+    setLogMessages(prevMessages => [...prevMessages, message]);
+  };
+  
+  // Bekleme yardımcı fonksiyonu
+  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  
+  // Tek Yönlü Bağlı Liste görselleştirmesi
+  const visualizeSinglyLinkedList = async () => {
+    if (sorting) return;
+    
+    // Operasyon tipine göre uygun fonksiyonu çağır
+    switch (selectedOperation) {
+      case 'demo':
+        await performLinkedListDemo();
+        break;
+      case 'prepend':
+        await performPrepend();
+        break;
+      case 'append':
+        await performAppend();
+        break;
+      case 'insert':
+        await performInsertAt();
+        break;
+      case 'search':
+        await performSearch();
+        break;
+      case 'deleteHead':
+        await performDeleteHead();
+        break;
+      case 'deleteTail':
+        await performDeleteTail();
+        break;
+      case 'deleteValue':
+        await performDeleteValue();
+        break;
+      case 'traverse':
+        await performTraverse();
+        break;
+      case 'clear':
+        await performClear();
+        break;
+      default:
+        setExplanationText('Lütfen bir işlem seçin.');
+    }
+  };
+  
+  // Demo - Tüm operasyonları sırayla göster
+  const performLinkedListDemo = async () => {
+    setSorting(true);
+    setCurrentStep(0);
+    setTotalSteps(10);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    try {
+      let linkedList = [...array];
+      setExplanationText('🔗 Tek Yönlü Bağlı Liste Demo: Veri yapısının temel operasyonlarını keşfedelim...');
+      addLogMessage('Tek Yönlü Bağlı Liste Demo başlatıldı');
+      await wait(speed);
+      
+      // Bağlı liste spesifik demo adımları - bu adımlara null kontrolü ekleyeceğiz
+      const linkedListOperations = [
+        { name: 'Yapı Açıklaması', action: async () => { try { await explainStructure(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'HEAD Pointer', action: async () => { try { await showHeadPointer(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'Başa Ekleme O(1)', action: async () => { try { await demoInsert(linkedList, 'head'); } catch (e) { console.error(e); } } },
+        { name: 'Sona Ekleme O(n)', action: async () => { try { await demoInsert(linkedList, 'tail'); } catch (e) { console.error(e); } } },
+        { name: 'Doğrusal Arama O(n)', action: async () => { try { await demoSearch(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'Liste Dolaşma O(n)', action: async () => { try { await demoTraverse(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'Baştan Silme O(1)', action: async () => { try { await demoDelete(linkedList, 'head'); } catch (e) { console.error(e); } } },
+        { name: 'Sondan Silme O(n)', action: async () => { try { await demoDelete(linkedList, 'tail'); } catch (e) { console.error(e); } } },
+        { name: 'Bellek Yönetimi', action: async () => { try { await showMemoryManagement(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'Demo Tamamlandı', action: async () => { try { await demoComplete(linkedList); } catch (e) { console.error(e); } } }
+      ];
+      
+      for (let i = 0; i < linkedListOperations.length; i++) {
+        setCurrentStep(i + 1);
+        addLogMessage(`Demo adım ${i+1}: ${linkedListOperations[i].name}`);
+        await linkedListOperations[i].action();
+        linkedList = [...array]; // Güncel listeyi al
+      }
+      
+    } catch (error) {
+      console.error("Bağlı Liste Demo sırasında hata:", error);
+      setExplanationText("Demo sırasında bir hata oluştu.");
+      addLogMessage("HATA: Demo işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Başa ekleme (Prepend)
+  const performPrepend = async () => {
+    if (!inputValue.trim()) {
+      setExplanationText('⚠️ Lütfen eklenecek değeri girin!');
+      return;
+    }
+    
+    const value = parseInt(inputValue);
+    if (isNaN(value)) {
+      setExplanationText('⚠️ Lütfen geçerli bir sayı girin!');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(3);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      let linkedList = [...array];
+      
+      setCurrentStep(1);
+      setExplanationText(`➕ Başa ${value} değeri ekleniyor...`);
+      addLogMessage(`Başa ekleme işlemi: ${value}`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      setCurrentStep(2);
+      setExplanationText(`🔗 Yeni düğümün next pointer'ı mevcut HEAD'i gösterecek...`);
+      addLogMessage(`Yeni düğüm oluşturuluyor, next pointer HEAD'i gösterecek`);
+      if (linkedList.length > 0) {
+        // Mevcut head'i vurgula
+        barColors.current[0].setValue(1); // Karşılaştırma rengi
+      }
+      await wait(speed);
+      
+      setCurrentStep(3);
+      // Değeri listeye ekle
+      linkedList.unshift(value);
+      setArray([...linkedList]);
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current = [new Animated.Value(0), ...barRefs.current];
+      barColors.current = [new Animated.Value(2), ...barColors.current];
+      
+      setExplanationText(`✅ ${value} başa eklendi! HEAD pointer artık yeni düğümü gösteriyor. Zaman: O(1)`);
+      addLogMessage(`Başa ekleme tamamlandı: ${value} değeri eklendi`);
+      setInputValue(''); // Input'u temizle
+      
+    } catch (error) {
+      console.error("Prepend sırasında hata:", error);
+      setExplanationText("İşlem sırasında bir hata oluştu.");
+      addLogMessage("HATA: Başa ekleme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Sona ekleme (Append)
+  const performAppend = async () => {
+    if (!inputValue.trim()) {
+      setExplanationText('⚠️ Lütfen eklenecek değeri girin!');
+      return;
+    }
+    
+    const value = parseInt(inputValue);
+    if (isNaN(value)) {
+      setExplanationText('⚠️ Lütfen geçerli bir sayı girin!');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(array.length + 2);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      let linkedList = [...array];
+      
+      setCurrentStep(1);
+      setExplanationText(`➕ Sona ${value} değeri ekleniyor...`);
+      addLogMessage(`Sona ekleme işlemi: ${value}`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      // Son düğümü bul
+      for (let i = 0; i < linkedList.length; i++) {
+        setCurrentStep(i + 2);
+        barColors.current[i].setValue(1); // Karşılaştırma rengi
+        setExplanationText(`🔍 ${i + 1}. düğüm kontrol ediliyor... Son düğümü arıyoruz.`);
+        addLogMessage(`Düğüm ${i+1} kontrol ediliyor: Son düğümü arama`);
+        await wait(speed / 2);
+      }
+      
+      setCurrentStep(linkedList.length + 2);
+      // Değeri listeye ekle
+      linkedList.push(value);
+      setArray([...linkedList]);
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current.push(new Animated.Value(0));
+      barColors.current.push(new Animated.Value(2));
+      
+      setExplanationText(`✅ ${value} sona eklendi! Son düğümün next'i yeni düğümü gösteriyor. Zaman: O(n)`);
+      addLogMessage(`Sona ekleme tamamlandı: ${value} değeri eklendi`);
+      setInputValue(''); // Input'u temizle
+      
+    } catch (error) {
+      console.error("Append sırasında hata:", error);
+      setExplanationText("İşlem sırasında bir hata oluştu.");
+      addLogMessage("HATA: Sona ekleme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Belirli pozisyona ekleme
+  const performInsertAt = async () => {
+    if (!inputValue.trim() || !insertPosition.trim()) {
+      setExplanationText('⚠️ Lütfen değer ve pozisyon girin!');
+      return;
+    }
+    
+    const value = parseInt(inputValue);
+    const position = parseInt(insertPosition);
+    
+    if (isNaN(value) || isNaN(position)) {
+      setExplanationText('⚠️ Lütfen geçerli sayılar girin!');
+      return;
+    }
+    
+    if (position < 0 || position > array.length) {
+      setExplanationText(`⚠️ Pozisyon 0-${array.length} arasında olmalı!`);
+      return;
+    }
+    
+    setSorting(true);
+    setCurrentStep(0);
+    setTotalSteps(position + 3);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    try {
+      let linkedList = [...array];
+      
+      setCurrentStep(1);
+      setExplanationText(`🎯 ${position + 1}. pozisyona ${value} ekleniyor...`);
+      addLogMessage(`Pozisyona ekleme işlemi: ${value} değeri ${position+1}. pozisyona ekleniyor`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      // Pozisyona kadar git
+      for (let i = 0; i < position; i++) {
+        setCurrentStep(i + 2);
+        barColors.current[i].setValue(1); // Karşılaştırma rengi
+        setExplanationText(`🔍 ${i + 1}. düğümden ${position + 1}. pozisyona gidiyoruz...`);
+        addLogMessage(`Düğüm ${i+1} geçiliyor: Hedef pozisyona doğru`);
+        await wait(speed / 2);
+      }
+      
+      setCurrentStep(position + 2);
+      if (position < linkedList.length) {
+        barColors.current[position].setValue(1); // Karşılaştırma rengi
+        setExplanationText(`🔗 Yeni düğüm ${position + 1}. pozisyondaki düğümün önüne eklenecek...`);
+        addLogMessage(`Hedef pozisyon bulundu: ${position+1}`);
+        await wait(speed);
+      }
+      
+      setCurrentStep(position + 3);
+      linkedList.splice(position, 0, value);
+      setArray([...linkedList]);
+      barColors.current[position].setValue(2); // Takas rengi
+      setExplanationText(`✅ ${value} değeri ${position + 1}. pozisyona eklendi! Pointer'lar güncellendi. Zaman: O(n)`);
+      addLogMessage(`Pozisyona ekleme tamamlandı: ${value} değeri ${position+1}. pozisyona eklendi`);
+      setInputValue('');
+      setInsertPosition('');
+      
+    } catch (error) {
+      console.error("Insert sırasında hata:", error);
+      setExplanationText("İşlem sırasında bir hata oluştu.");
+      addLogMessage("HATA: Pozisyona ekleme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Arama
+  const performSearch = async () => {
+    if (!inputValue.trim()) {
+      setExplanationText('⚠️ Lütfen aranacak değeri girin!');
+      return;
+    }
+    
+    const value = parseInt(inputValue);
+    if (isNaN(value)) {
+      setExplanationText('⚠️ Lütfen geçerli bir sayı girin!');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(array.length);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      let found = false;
+      let foundIndex = -1;
+      
+      setExplanationText(`🔍 ${value} değeri aranıyor...`);
+      addLogMessage(`Arama işlemi: ${value} değeri aranıyor`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      // Sırayla arama
+      for (let i = 0; i < array.length; i++) {
+        setCurrentStep(i + 1);
+        barColors.current[i].setValue(1); // Karşılaştırma rengi
+        setExplanationText(`🔍 ${i + 1}. düğüm kontrol ediliyor: ${array[i]} === ${value}?`);
+        addLogMessage(`Düğüm ${i+1} kontrol ediliyor: ${array[i]} == ${value}?`);
+        await wait(speed);
+        
+        if (array[i] === value) {
+          barColors.current[i].setValue(3); // Sıralanmış rengi
+          setExplanationText(`🎉 ${value} değeri ${i + 1}. pozisyonda bulundu! Zaman: O(${i + 1})`);
+          addLogMessage(`BULUNDU! ${value} değeri ${i+1}. pozisyonda`);
+          found = true;
+          foundIndex = i;
+          break;
+        } else {
+          // Kontrol edildi, bulunamadı
+          await wait(speed / 2);
+          barColors.current[i].setValue(0); // Normal renk
+          addLogMessage(`Eşleşme yok: ${array[i]} != ${value}`);
+        }
+      }
+      
+      if (!found) {
+        setExplanationText(`❌ ${value} değeri listede bulunamadı! Zaman: O(n)`);
+        addLogMessage(`Arama tamamlandı: ${value} değeri bulunamadı`);
+      }
+      
+      setInputValue('');
+      
+    } catch (error) {
+      console.error("Search sırasında hata:", error);
+      setExplanationText("Arama sırasında bir hata oluştu.");
+      addLogMessage("HATA: Arama işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Baştan silme
+  const performDeleteHead = async () => {
+    if (array.length === 0) {
+      setExplanationText('⚠️ Liste boş! Silinecek eleman yok.');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(3);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      let linkedList = [...array];
+      const deletedValue = linkedList[0];
+      
+      setCurrentStep(1);
+      barColors.current[0].setValue(2); // Takas rengi
+      setExplanationText(`🗑️ Baştan eleman siliniyor: ${deletedValue}`);
+      addLogMessage(`Baştan silme işlemi: ${deletedValue} siliniyor`);
+      await wait(speed);
+      
+      setCurrentStep(2);
+      if (linkedList.length > 1) {
+        barColors.current[1].setValue(1); // Karşılaştırma rengi
+        setExplanationText(`🔗 HEAD pointer ikinci düğümü (${linkedList[1]}) gösterecek...`);
+        addLogMessage(`HEAD pointer ikinci düğüme yönlendiriliyor`);
+        await wait(speed);
+      }
+      
+      setCurrentStep(3);
+      // Baştan değeri kaldır
+      linkedList.shift();
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current.shift();
+      barColors.current.shift();
+      
+      setArray([...linkedList]);
+      
+      // Kalan barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      setExplanationText(`✅ ${deletedValue} silindi! HEAD pointer güncellendi. Zaman: O(1)`);
+      addLogMessage(`Baştan silme tamamlandı: ${deletedValue} silindi`);
+      
+    } catch (error) {
+      console.error("Delete head sırasında hata:", error);
+      setExplanationText("Silme sırasında bir hata oluştu.");
+      addLogMessage("HATA: Baştan silme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Sondan silme
+  const performDeleteTail = async () => {
+    if (array.length === 0) {
+      setExplanationText('⚠️ Liste boş! Silinecek eleman yok.');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(array.length + 1);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      let linkedList = [...array];
+      const deletedValue = linkedList[linkedList.length - 1];
+      
+      setExplanationText(`🗑️ Sondan eleman siliniyor: ${deletedValue}`);
+      addLogMessage(`Sondan silme işlemi: ${deletedValue} siliniyor`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      // Son elemandan önceki elemana git
+      for (let i = 0; i < linkedList.length - 1; i++) {
+        setCurrentStep(i + 1);
+        barColors.current[i].setValue(1); // Karşılaştırma rengi
+        setExplanationText(`🔍 ${i + 1}. düğüm: Son elemandan önceki düğümü arıyoruz...`);
+        addLogMessage(`Düğüm ${i+1} kontrol ediliyor: Son elemandan önceki aranıyor`);
+        await wait(speed / 2);
+      }
+      
+      setCurrentStep(linkedList.length);
+      barColors.current[linkedList.length - 1].setValue(2); // Takas rengi
+      setExplanationText(`🔗 Son düğümün bağlantısı koparılıyor...`);
+      addLogMessage(`Son düğüm bulundu: Bağlantı koparılıyor`);
+      await wait(speed);
+      
+      setCurrentStep(linkedList.length + 1);
+      // Sondan değeri kaldır
+      linkedList.pop();
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current.pop();
+      barColors.current.pop();
+      
+      setArray([...linkedList]);
+      
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      setExplanationText(`✅ ${deletedValue} silindi! Önceki düğümün next'i NULL olarak ayarlandı. Zaman: O(n)`);
+      addLogMessage(`Sondan silme tamamlandı: ${deletedValue} silindi`);
+      
+    } catch (error) {
+      console.error("Delete tail sırasında hata:", error);
+      setExplanationText("Silme sırasında bir hata oluştu.");
+      addLogMessage("HATA: Sondan silme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Belirli değer silme
+  const performDeleteValue = async () => {
+    if (!inputValue.trim()) {
+      setExplanationText('⚠️ Lütfen silinecek değeri girin!');
+      return;
+    }
+    
+    const value = parseInt(inputValue);
+    if (isNaN(value)) {
+      setExplanationText('⚠️ Lütfen geçerli bir sayı girin!');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(array.length);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      let linkedList = [...array];
+      let found = false;
+      
+      setExplanationText(`🗑️ ${value} değeri aranıp siliniyor...`);
+      addLogMessage(`Değer silme işlemi: ${value} aranıyor`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      // Değeri ara ve sil
+      for (let i = 0; i < linkedList.length; i++) {
+        setCurrentStep(i + 1);
+        barColors.current[i].setValue(1); // Karşılaştırma rengi
+        setExplanationText(`🔍 ${i + 1}. düğüm kontrol ediliyor: ${linkedList[i]} === ${value}?`);
+        addLogMessage(`Düğüm ${i+1} kontrol ediliyor: ${linkedList[i]} == ${value}?`);
+        await wait(speed);
+        
+        if (linkedList[i] === value) {
+          barColors.current[i].setValue(2); // Takas rengi
+          setExplanationText(`🗑️ ${value} bulundu! Düğüm siliniyor...`);
+          addLogMessage(`BULUNDU! ${value} değeri ${i+1}. pozisyonda siliniyor`);
+          await wait(speed);
+          
+          // Değeri listeden kaldır
+          linkedList.splice(i, 1);
+          
+          // Animasyon değerlerini güncelle
+          barRefs.current.splice(i, 1);
+          barColors.current.splice(i, 1);
+          
+          setArray([...linkedList]);
+          setExplanationText(`✅ ${value} silindi! Önceki düğümün pointer'ı güncellenidi. Zaman: O(n)`);
+          addLogMessage(`Değer silme tamamlandı: ${value} silindi`);
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        setExplanationText(`❌ ${value} değeri listede bulunamadı!`);
+        addLogMessage(`Değer silme tamamlandı: ${value} değeri bulunamadı`);
+      }
+      
+      setInputValue('');
+      
+    } catch (error) {
+      console.error("Delete value sırasında hata:", error);
+      setExplanationText("Silme sırasında bir hata oluştu.");
+      addLogMessage("HATA: Değer silme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Renk değerlerini animasyonlu renklere dönüştür
+  const getBarColor = (index: number) => {
+    // barColors.current[index] değeri henüz yoksa veya tanımsızsa yeni bir değer oluştur
+    if (!barColors.current || !barColors.current[index]) {
+      // Eksik değer varsa düzelt
+      if (!barColors.current) {
+        barColors.current = [];
+      }
+      if (!barColors.current[index]) {
+        barColors.current[index] = new Animated.Value(0);
+      }
+      return normalColor; // Varsayılan renk döndür
+    }
+    
+    return barColors.current[index].interpolate({
+      inputRange: [0, 1, 2, 3],
+      outputRange: [normalColor, comparingColor, swappingColor, sortedColor],
+    });
+  };
+  
+  // İki barın yerinin değişmesini animasyonla göster
+  const animateSwap = (index1: number, index2: number, delay: number = 0): Promise<void> => {
+    const bar1Position = index1 * (BAR_WIDTH + BAR_MARGIN);
+    const bar2Position = index2 * (BAR_WIDTH + BAR_MARGIN);
+    const distance = bar2Position - bar1Position;
+    
+    return new Promise<void>((resolve) => {
+      // Referanslar hazır değilse işlemi sonlandır
+      if (!barRefs.current || !barColors.current || 
+          !barRefs.current[index1] || !barRefs.current[index2] ||
+          !barColors.current[index1] || !barColors.current[index2]) {
+        console.warn(`animateSwap: Geçersiz indeksler (${index1}, ${index2}) veya referanslar hazır değil`);
+        resolve();
+        return;
+      }
+      
+      // Karşılaştırma rengini ayarla
+      Animated.timing(barColors.current[index1], {
+        toValue: 1, // Turuncu - karşılaştırma
+        duration: speed / 3,
+        useNativeDriver: false,
+      }).start();
+      
+      Animated.timing(barColors.current[index2], {
+        toValue: 1, // Turuncu - karşılaştırma
+        duration: speed / 3,
+        useNativeDriver: false,
+      }).start();
+      
+      setTimeout(() => {
+        // Takas rengini ayarla
+        Animated.timing(barColors.current[index1], {
+          toValue: 2, // Kırmızı - takas
+          duration: speed / 3,
+          useNativeDriver: false,
+        }).start();
+        
+        Animated.timing(barColors.current[index2], {
+          toValue: 2, // Kırmızı - takas
+          duration: speed / 3,
+          useNativeDriver: false,
+        }).start();
+        
+        // Bar 1'i sağa taşı
+        Animated.timing(barRefs.current[index1], {
+          toValue: distance,
+          duration: speed,
+          useNativeDriver: false,
+        }).start();
+        
+        // Bar 2'yi sola taşı
+        Animated.timing(barRefs.current[index2], {
+          toValue: -distance,
+          duration: speed,
+          useNativeDriver: false,
+        }).start();
+        
+        // Animasyon tamamlandıktan sonra referansları sıfırla
+        setTimeout(() => {
+          barRefs.current[index1].setValue(0);
+          barRefs.current[index2].setValue(0);
+          
+          // Normal renklere geri dön
+          Animated.timing(barColors.current[index1], {
+            toValue: 0, // Normal renk
+            duration: speed / 3,
+            useNativeDriver: false,
+          }).start();
+          
+          Animated.timing(barColors.current[index2], {
+            toValue: 0, // Normal renk
+            duration: speed / 3,
+            useNativeDriver: false,
+          }).start();
+          
+          resolve();
+        }, speed);
+      }, speed / 3);
+    });
+  };
+  
+  // Renkleri animasyonla değiştir
+  const animateColor = (index: number, colorValue: number, duration: number = speed / 2): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      // index geçerli bir aralıkta değilse ya da barColors henüz hazır değilse
+      if (!barColors.current || !barColors.current[index]) {
+        console.warn(`animateColor: Geçersiz index (${index}) veya barColors hazır değil`);
+        resolve(); // İşlemi sonlandır
+        return;
+      }
+      
+      Animated.timing(barColors.current[index], {
+        toValue: colorValue,
+        duration,
+        useNativeDriver: false,
+      }).start(() => {
+        resolve();
+      });
+    });
+  };
+  
+  // Algoritma tipine göre doğru görselleştirmeyi çağır
+  const startVisualization = () => {
+    if (sorting) return;
+    
+    // Tüm renkleri sıfırla
+    if (barColors.current) {
+      barColors.current.forEach((color, index) => {
+        if (color) {
+          color.setValue(0);
+        }
+      });
+    }
+    
+    // Bağlı liste algoritmaları için
+    if (algorithmType.toLowerCase().includes('linked') || 
+        algorithmType.toLowerCase().includes('bağlı liste') || 
+        algorithmType.toLowerCase().includes('dairesel')) {
+      
+      console.log('Starting linked list visualization for operation:', selectedOperation);
+      
+      // Bağlı liste tipine göre doğru görselleştirmeyi çağır
+      if (algorithmType.toLowerCase().includes('doubly') || 
+          algorithmType.toLowerCase().includes('çift')) {
+        visualizeDoublyLinkedList();
+      } else if (algorithmType.toLowerCase().includes('circular') ||
+                algorithmType.toLowerCase().includes('dairesel')) {
+        // Dairesel bağlı liste için (henüz uygulanmadı)
+        setExplanationText('Dairesel Bağlı Liste uygulaması henüz eklenmedi.');
+      } else {
+        // Tek yönlü bağlı liste için
+        visualizeSinglyLinkedList();
+      }
+      return;
+    }
+    
+    switch (algorithmType.toLowerCase()) {
+      case 'bubble sort':
+      case 'kabarcık sıralama':
+      case 'kabarcık sıralaması':
+        // Bubble sort implementation will be added later
+        setExplanationText('Bubble Sort uygulaması henüz eklenmedi.');
+        break;
+      case 'binary search':
+      case 'ikili arama':
+      case 'binary arama':
+        // Binary search implementation will be added later
+        setExplanationText('Binary Search uygulaması henüz eklenmedi.');
+        break;
+      case 'merge sort':
+      case 'birleştirme sıralaması':
+      case 'merge sıralama':
+        // Merge sort implementation will be added later
+        setExplanationText('Merge Sort uygulaması henüz eklenmedi.');
+        break;
+      case 'quick sort':
+      case 'hızlı sıralama':
+      case 'quicksort':
+        // Quick sort implementation will be added later
+        setExplanationText('Quick Sort uygulaması henüz eklenmedi.');
+        break;
+      case 'linear search':
+      case 'doğrusal arama':
+      case 'sıralı arama':
+        visualizeLinearSearch();
+        break;
+      case 'selection sort':
+      case 'seçim sıralaması':
+      case 'seçmeli sıralama':
+        visualizeSelectionSort();
+        break;
+      case 'insertion sort':
+      case 'ekleme sıralaması':
+      case 'yerleştirme sıralaması':
+        visualizeInsertionSort();
+        break;
+      case 'heap sort':
+      case 'yığın sıralaması':
+        visualizeHeapSort();
+        break;
+      case 'counting sort':
+      case 'sayma sıralaması':
+        visualizeCountingSort();
+        break;
+      case 'radix sort':
+      case 'taban sıralaması':
+        visualizeRadixSort();
+        break;
+      case 'shell sort':
+      case 'kabuk sıralaması':
+        visualizeShellSort();
+        break;
+      default:
+        setExplanationText(`${algorithmType} algoritması için görselleştirme henüz uygulanmadı. Mevcut algoritmalar: Bubble Sort, Selection Sort, Insertion Sort, Merge Sort, Quick Sort, Heap Sort, Linear Search, Binary Search, Singly Linked List, Doubly Linked List, Circular Linked List`);
+        break;
+    }
+  };
+  
+  // Linear Search algoritması için görselleştirme
+  const visualizeLinearSearch = async () => {
+    if (sorting) return;
+    
+    // Hedef değeri kontrol et
+    if (!searchTarget.trim()) {
+      Alert.alert('Hata', 'Lütfen aranacak sayıyı girin.');
+      return;
+    }
+    
+    const target = parseInt(searchTarget.trim());
+    if (isNaN(target)) {
+      Alert.alert('Hata', 'Lütfen geçerli bir sayı girin.');
+      return;
+    }
+    
+    setSorting(true);
+    setCurrentStep(0);
+    
+    const arr = [...array];
+    const n = arr.length;
+    
+    setExplanationText(`Linear Search: ${target} değeri aranıyor.`);
+    
+    // Adım sayısını belirle
+    setTotalSteps(n);
+    
+    let found = false;
+    
+    try {
+    // Diziyi soldan sağa tarama
+    for (let i = 0; i < n; i++) {
+      // Mevcut elemanı vurgula
+      setCurrentStep(i + 1);
+      setExplanationText(`Adım ${i + 1}: ${arr[i]} elemanı kontrol ediliyor...`);
+      
+      // Elemanı vurgula
+      await animateColor(i, 1, 300);
+      
+      if (arr[i] === target) {
+        // Eleman bulundu
+        setExplanationText(`${target} değeri ${i}. indekste bulundu!`);
+        await animateColor(i, 3, 500); // Bulunan eleman yeşil renkte vurgulanır
+        found = true;
+        break;
+      }
+      
+      // Eleman bulunamadı, bir sonraki elemana geç
+      await animateColor(i, 0, 200);
+    }
+    
+    if (!found) {
+      setExplanationText(`${target} değeri dizide bulunamadı.`);
+    }
+    } catch (error) {
+      console.error("Linear Search sırasında hata:", error);
+      setExplanationText("Görselleştirme sırasında bir hata oluştu.");
+    } finally {
+    setSorting(false);
+    }
+  };
+  
+  // Selection Sort algoritması için görselleştirme
+  const visualizeSelectionSort = async () => {
+    if (sorting) return;
+    setSorting(true);
+    setCurrentStep(0);
+    
+    try {
+      const newArray = [...array];
+      const n = newArray.length;
+      let totalSwaps = 0;
+      let totalComparisons = 0;
+      
+      // Toplam adım sayısını hesapla
+      setTotalSteps(n - 1);
+      
+      setExplanationText('Selection Sort algoritması başlatılıyor. Her adımda kalan elemanlar arasından en küçüğünü bulup doğru pozisyona yerleştirir.');
+      
+      for (let i = 0; i < n - 1; i++) {
+        let minIndex = i;
+        setCurrentStep(i + 1);
+        setExplanationText(`${i + 1}. geçiş: ${i + 1}. pozisyon için en küçük eleman aranıyor...`);
+        
+        // Mevcut minimum elemanı vurgula
+        await animateColor(minIndex, 1);
+        await new Promise(resolve => setTimeout(resolve, speed / 3));
+        
+        for (let j = i + 1; j < n; j++) {
+          totalComparisons++;
+          
+          // Karşılaştırılan elemanı vurgula
+          await animateColor(j, 2);
+          setExplanationText(`Minimum ${newArray[minIndex]} ile ${newArray[j]} karşılaştırılıyor... (${totalComparisons}. karşılaştırma)`);
+          
+          await new Promise(resolve => setTimeout(resolve, speed / 2));
+          
+          if (newArray[j] < newArray[minIndex]) {
+            // Önceki minimum elemanı normal renge döndür
+            await animateColor(minIndex, 0);
+            minIndex = j;
+            // Yeni minimum elemanı vurgula
+            await animateColor(minIndex, 1);
+            setExplanationText(`Yeni minimum bulundu: ${newArray[minIndex]} (pozisyon ${j + 1})`);
+            await new Promise(resolve => setTimeout(resolve, speed / 3));
+          }
+          
+          // Karşılaştırılan elemanı normal renge döndür
+          await animateColor(j, 0);
+        }
+        
+        // Minimum elemanı doğru pozisyona taşı
+        if (minIndex !== i) {
+          totalSwaps++;
+          
+          // Takas animasyonu
+          await Promise.all([
+            animateColor(i, 2),
+            animateColor(minIndex, 2),
+          ]);
+          
+          setExplanationText(`${newArray[i]} ile ${newArray[minIndex]} takas ediliyor... (${totalSwaps}. takas)`);
+          
+          await new Promise(resolve => setTimeout(resolve, speed / 3));
+          
+          // Değerleri takas et
+          const temp = newArray[i];
+          newArray[i] = newArray[minIndex];
+          newArray[minIndex] = temp;
+          
+          // Takas animasyonunu göster
+          await animateSwap(i, minIndex);
+          
+          // Diziyi güncelle
+          setArray([...newArray]);
+          
+          await new Promise(resolve => setTimeout(resolve, speed / 4));
+        } else {
+          setExplanationText(`${newArray[i]} zaten doğru pozisyonda, takas gerekmiyor.`);
+          await new Promise(resolve => setTimeout(resolve, speed / 3));
+        }
+        
+        // Sıralanmış elemanı işaretle
+        await animateColor(i, 3);
+        setExplanationText(`${i + 1}. geçiş tamamlandı. ${newArray[i]} doğru konumuna yerleşti.`);
+        
+        // Geçişler arası kısa bekle
+        await new Promise(resolve => setTimeout(resolve, speed / 3));
+      }
+      
+      // Son elemanı da sıralanmış olarak işaretle
+      await animateColor(n - 1, 3);
+      
+      setExplanationText(`Selection Sort tamamlandı! Toplam ${totalSwaps} takas ve ${totalComparisons} karşılaştırma yapıldı. Dizi başarıyla sıralandı.`);
+    } catch (error) {
+      console.error("Selection Sort sırasında hata:", error);
+      setExplanationText("Görselleştirme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Insertion Sort algoritması için görselleştirme
+  const visualizeInsertionSort = async () => {
+    if (sorting) return;
+    setSorting(true);
+    setCurrentStep(0);
+    
+    const arr = [...array];
+    const n = arr.length;
+    let stepCount = 0;
+    const steps = n * (n - 1) / 2; // Worst case adım sayısı tahmini
+    setTotalSteps(steps);
+    
+    setExplanationText('Insertion Sort, sıralanmış alt dizi oluşturarak her yeni elemanı doğru konuma yerleştirir.');
+    
+    // İlk eleman başlangıçta sıralanmış kabul edilir
+    await animateColor(0, 3);
+    
+    for (let i = 1; i < n; i++) {
+      // Şu anki elemanı vurgula
+      await animateColor(i, 2);
+      setExplanationText(`${arr[i]} elemanı sıralanmış alt diziye yerleştirilecek.`);
+      await new Promise(resolve => setTimeout(resolve, speed));
+      
+      // Mevcut elemanı key olarak al
+      const key = arr[i];
+      let j = i - 1;
+      
+      // key'den büyük olan elemanları bir pozisyon sağa kaydır
+      while (j >= 0 && arr[j] > key) {
+        stepCount++;
+        setCurrentStep(stepCount);
+        
+        // Karşılaştırma yapılıyor
+        setExplanationText(`Adım ${stepCount}: ${arr[j]} > ${key}, ${arr[j]} elemanı sağa kaydırılıyor`);
+        
+        // Elemanı vurgula
+        await animateColor(j, 1);
+        
+        // Elemanı bir sağa kaydır
+        arr[j + 1] = arr[j];
+        
+        // Kaydırma animasyonunu göster (sağa kaydırma)
+        await animateSwap(j, j + 1);
+        
+        // Diziyi güncelle
+        setArray([...arr]);
+        
+        j--;
+      }
+      
+      // Doğru konuma yerleştir
+      arr[j + 1] = key;
+      
+      // Sıraya giren elemanları işaretle
+      for (let k = 0; k <= i; k++) {
+        await animateColor(k, 3);
+      }
+    }
+    
+    setExplanationText('Insertion Sort tamamlandı! Dizi sıralandı.');
+    setSorting(false);
+  };
+
+  // Heap Sort algoritması için görselleştirme
+  const visualizeHeapSort = async () => {
+    if (sorting) return;
+    setSorting(true);
+    setCurrentStep(0);
+    
+    try {
+      const arr = [...array];
+      const n = arr.length;
+      let stepCount = 0;
+      setTotalSteps(n * Math.log2(n));
+      
+      setExplanationText('Heap Sort algoritması başlatılıyor. Önce max heap oluşturulacak, sonra elemanlar tek tek çıkarılacak.');
+      
+      // Max heap oluştur
+      for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+        await heapify(arr, n, i, stepCount);
+        stepCount++;
+        setCurrentStep(stepCount);
+      }
+      
+      setExplanationText('Max heap oluşturuldu. Şimdi elemanlar tek tek çıkarılacak.');
+      
+      // Elemanları tek tek çıkar
+      for (let i = n - 1; i > 0; i--) {
+        // Kök ile son elemanı takas et
+        await Promise.all([
+          animateColor(0, 2),
+          animateColor(i, 2),
+        ]);
+        
+        setExplanationText(`En büyük eleman ${arr[0]} son pozisyona taşınıyor...`);
+        
+        const temp = arr[0];
+        arr[0] = arr[i];
+        arr[i] = temp;
+        
+        await animateSwap(0, i);
+        setArray([...arr]);
+        
+        // Sıralanmış elemanı işaretle
+        await animateColor(i, 3);
+        
+        // Kalan heap'i düzenle
+        await heapify(arr, i, 0, stepCount);
+        stepCount++;
+        setCurrentStep(stepCount);
+      }
+      
+      // İlk elemanı da sıralanmış olarak işaretle
+      await animateColor(0, 3);
+      
+      setExplanationText('Heap Sort tamamlandı! Dizi başarıyla sıralandı.');
+    } catch (error) {
+      console.error("Heap Sort sırasında hata:", error);
+      setExplanationText("Görselleştirme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Heapify yardımcı fonksiyonu
+  const heapify = async (arr: number[], n: number, i: number, stepCount: number) => {
+    let largest = i;
+    const left = 2 * i + 1;
+    const right = 2 * i + 2;
+    
+    // Sol çocuk kökten büyükse
+    if (left < n && arr[left] > arr[largest]) {
+      largest = left;
+    }
+    
+    // Sağ çocuk şu anki en büyükten büyükse
+    if (right < n && arr[right] > arr[largest]) {
+      largest = right;
+    }
+    
+    // En büyük kök değilse
+    if (largest !== i) {
+      await Promise.all([
+        animateColor(i, 1),
+        animateColor(largest, 1),
+      ]);
+      
+      const temp = arr[i];
+      arr[i] = arr[largest];
+      arr[largest] = temp;
+      
+      await animateSwap(i, largest);
+      
+      // Etkilenen alt ağacı da düzenle
+      await heapify(arr, n, largest, stepCount);
+    }
+  };
+
+  // Counting Sort algoritması için görselleştirme
+  const visualizeCountingSort = async () => {
+    if (sorting) return;
+    setSorting(true);
+    setCurrentStep(0);
+    
+    try {
+      const arr = [...array];
+      const n = arr.length;
+      const max = Math.max(...arr);
+      const min = Math.min(...arr);
+      const range = max - min + 1;
+      
+      setTotalSteps(n + range);
+      setExplanationText(`Counting Sort başlatılıyor. Değer aralığı: ${min}-${max}`);
+      
+      // Sayma dizisini oluştur
+      const count = new Array(range).fill(0);
+      
+      // Her elemanın sayısını say
+      for (let i = 0; i < n; i++) {
+        await animateColor(i, 1);
+        count[arr[i] - min]++;
+        setExplanationText(`${arr[i]} değeri sayılıyor... (${count[arr[i] - min]}. kez)`);
+        setCurrentStep(i + 1);
+        await new Promise(resolve => setTimeout(resolve, speed / 2));
+        await animateColor(i, 0);
+      }
+      
+      setExplanationText('Sayma tamamlandı. Şimdi sıralı dizi oluşturuluyor...');
+      
+      // Sıralı diziyi oluştur
+      const sortedArr = [];
+      let step = n;
+      
+      for (let i = 0; i < range; i++) {
+        while (count[i] > 0) {
+          sortedArr.push(i + min);
+          count[i]--;
+          step++;
+          setCurrentStep(step);
+        }
+      }
+      
+      // Diziyi güncelle ve animasyon göster
+      for (let i = 0; i < n; i++) {
+        arr[i] = sortedArr[i];
+        await animateColor(i, 3);
+        setArray([...arr]);
+        await new Promise(resolve => setTimeout(resolve, speed / 3));
+      }
+      
+      setExplanationText('Counting Sort tamamlandı! Dizi O(n+k) zamanda sıralandı.');
+    } catch (error) {
+      console.error("Counting Sort sırasında hata:", error);
+      setExplanationText("Görselleştirme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setSorting(false);
+    }
+  };
+
+  // Radix Sort algoritması için görselleştirme
+  const visualizeRadixSort = async () => {
+    if (sorting) return;
+    setSorting(true);
+    setCurrentStep(0);
+    
+    try {
+      const arr = [...array];
+      const n = arr.length;
+      const max = Math.max(...arr);
+      
+      // Maksimum basamak sayısını bul
+      const maxDigits = max.toString().length;
+      setTotalSteps(maxDigits * n);
+      
+      setExplanationText(`Radix Sort başlatılıyor. Maksimum ${maxDigits} basamak işlenecek.`);
+      
+      // Her basamak için counting sort uygula
+      for (let digit = 0; digit < maxDigits; digit++) {
+        setExplanationText(`${digit + 1}. basamak (${Math.pow(10, digit)}ler) işleniyor...`);
+        
+        await countingSortByDigit(arr, digit);
+        
+        // Ara sonucu göster
+        for (let i = 0; i < n; i++) {
+          await animateColor(i, 1);
+          await new Promise(resolve => setTimeout(resolve, speed / 4));
+          await animateColor(i, 0);
+        }
+      }
+      
+      // Tüm elemanları sıralanmış olarak işaretle
+      for (let i = 0; i < n; i++) {
+        await animateColor(i, 3);
+      }
+      
+      setExplanationText('Radix Sort tamamlandı! Dizi basamak basamak sıralandı.');
+    } catch (error) {
+      console.error("Radix Sort sırasında hata:", error);
+      setExplanationText("Görselleştirme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Belirli bir basamağa göre counting sort
+  const countingSortByDigit = async (arr: number[], digit: number) => {
+    const n = arr.length;
+    const output = new Array(n);
+    const count = new Array(10).fill(0);
+    
+    // Basamak değerlerini say
+    for (let i = 0; i < n; i++) {
+      const digitValue = Math.floor(arr[i] / Math.pow(10, digit)) % 10;
+      count[digitValue]++;
+    }
+    
+    // Kümülatif sayıları hesapla
+    for (let i = 1; i < 10; i++) {
+      count[i] += count[i - 1];
+    }
+    
+    // Çıktı dizisini oluştur
+    for (let i = n - 1; i >= 0; i--) {
+      const digitValue = Math.floor(arr[i] / Math.pow(10, digit)) % 10;
+      output[count[digitValue] - 1] = arr[i];
+      count[digitValue]--;
+    }
+    
+    // Orijinal diziye kopyala
+    for (let i = 0; i < n; i++) {
+      arr[i] = output[i];
+    }
+    
+    setArray([...arr]);
+  };
+
+  // Shell Sort algoritması için görselleştirme
+  const visualizeShellSort = async () => {
+    if (sorting) return;
+    setSorting(true);
+    setCurrentStep(0);
+    
+    try {
+      const arr = [...array];
+      const n = arr.length;
+      let stepCount = 0;
+      
+      setTotalSteps(n * Math.log2(n));
+      setExplanationText('Shell Sort başlatılıyor. Azalan aralıklarla insertion sort uygulanacak.');
+      
+      // Aralığı n/2'den başlat ve her seferinde yarıya böl
+      for (let gap = Math.floor(n / 2); gap > 0; gap = Math.floor(gap / 2)) {
+        setExplanationText(`Aralık: ${gap} - Bu aralıkla insertion sort uygulanıyor...`);
+        
+        // Gap kadar aralıklı insertion sort
+        for (let i = gap; i < n; i++) {
+          const temp = arr[i];
+          let j = i;
+          
+          await animateColor(i, 2);
+          setExplanationText(`${temp} elemanı ${gap} aralıklı sıralamada yerleştiriliyor...`);
+          
+          while (j >= gap && arr[j - gap] > temp) {
+            stepCount++;
+            setCurrentStep(stepCount);
+            
+            await Promise.all([
+              animateColor(j, 1),
+              animateColor(j - gap, 1),
+            ]);
+            
+            arr[j] = arr[j - gap];
+            await animateSwap(j - gap, j);
+            setArray([...arr]);
+            
+            j -= gap;
+            
+            await Promise.all([
+              animateColor(j + gap, 0),
+              animateColor(j, 0),
+            ]);
+          }
+          
+          arr[j] = temp;
+          await animateColor(i, 0);
+          setArray([...arr]);
+        }
+        
+        setExplanationText(`Aralık ${gap} tamamlandı.`);
+        await new Promise(resolve => setTimeout(resolve, speed));
+      }
+      
+      // Tüm elemanları sıralanmış olarak işaretle
+      for (let i = 0; i < n; i++) {
+        await animateColor(i, 3);
+      }
+      
+      setExplanationText('Shell Sort tamamlandı! Dizi azalan aralıklarla sıralandı.');
+    } catch (error) {
+      console.error("Shell Sort sırasında hata:", error);
+      setExplanationText("Görselleştirme sırasında bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Traverse
+  const performTraverse = async () => {
+    if (array.length === 0) {
+      setExplanationText('⚠️ Liste boş! Dolaşılacak eleman yok.');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(array.length);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      setExplanationText('🚶‍♂️ Liste baştan sona dolaşılıyor...');
+      addLogMessage('Liste dolaşma işlemi başlatıldı');
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      for (let i = 0; i < array.length; i++) {
+        setCurrentStep(i + 1);
+        barColors.current[i].setValue(1); // Karşılaştırma rengi (burada ziyaret rengi olarak)
+        setExplanationText(`🚶‍♂️ ${i + 1}. düğüm ziyaret ediliyor: ${array[i]}`);
+        addLogMessage(`Düğüm ${i+1} ziyaret edildi: ${array[i]}`);
+        await wait(speed);
+        
+        // Bir önceki düğümü normal renge döndür (geçildi)
+        if (i > 0) {
+          barColors.current[i-1].setValue(0);
+        }
+      }
+      
+      // Tüm barları sıralanmış renk yap (tamamlandı)
+      barColors.current.forEach(color => color.setValue(3));
+      setExplanationText(`✅ Tüm liste dolaşıldı! ${array.length} düğüm ziyaret edildi. Zaman: O(n)`);
+      addLogMessage(`Liste dolaşma tamamlandı: ${array.length} düğüm ziyaret edildi`);
+      
+    } catch (error) {
+      console.error("Traverse sırasında hata:", error);
+      setExplanationText("Dolaşma sırasında bir hata oluştu.");
+      addLogMessage("HATA: Liste dolaşma işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Listeyi temizle
+  const performClear = async () => {
+    if (array.length === 0) {
+      setExplanationText('⚠️ Liste zaten boş!');
+      return;
+    }
+    
+    setSorting(true);
+    setCurrentStep(0);
+    setTotalSteps(1);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    try {
+      setCurrentStep(1);
+      setExplanationText('🗑️ Tüm liste temizleniyor...');
+      addLogMessage('Liste temizleme işlemi başlatıldı');
+      // Tüm barları takas rengi yap (siliniyor)
+      barColors.current.forEach(color => color.setValue(2));
+      await wait(speed);
+      
+      setArray([]);
+      setExplanationText('✅ Liste tamamen temizlendi! HEAD pointer NULL olarak ayarlandı.');
+      addLogMessage('Liste temizleme tamamlandı: Tüm düğümler silindi');
+      
+    } catch (error) {
+      console.error("Clear sırasında hata:", error);
+      setExplanationText("Temizleme sırasında bir hata oluştu.");
+      addLogMessage("HATA: Liste temizleme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Demo yardımcı fonksiyonları
+  const explainStructure = async (linkedList: number[]) => {
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    setExplanationText('📋 Bağlı Liste Yapısı: Her düğüm bir veri ve bir sonraki düğüme işaret eden pointer içerir.');
+    addLogMessage('Bağlı liste yapısı açıklanıyor');
+    await wait(speed);
+    
+    if (linkedList.length > 0) {
+      // Tüm düğümleri vurgula
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(1);
+      });
+      setExplanationText(`🔗 Düğümler: [${linkedList.map((val, i) => `${val}→`).join('')}NULL] - Son düğüm NULL'ı gösterir.`);
+      addLogMessage(`Liste yapısı: [${linkedList.join('→')}→NULL]`);
+      await wait(speed);
+    }
+  };
+  
+  const showHeadPointer = async (linkedList: number[]) => {
+    if (linkedList.length > 0) {
+      // Barları normal renge döndür
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(0);
+      });
+      // Head'i vurgula
+      if (barColors.current[0]) {
+        barColors.current[0].setValue(1);
+      }
+      setExplanationText(`👆 HEAD pointer ilk düğümü (${linkedList[0]}) işaret ediyor.`);
+      addLogMessage(`HEAD pointer ${linkedList[0]} değerini gösteriyor`);
+      await wait(speed);
+    }
+  };
+  
+  const demoInsert = async (linkedList: number[], position: 'head' | 'tail') => {
+    const value = Math.floor(Math.random() * 100) + 1;
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    if (position === 'head') {
+      setExplanationText(`➕ Başa Ekleme: Yeni düğüm (${value}) oluşturuluyor...`);
+      addLogMessage(`Başa ekleme demo: ${value} ekleniyor`);
+      await wait(speed / 2);
+      
+      setExplanationText(`🔗 Yeni düğümün next'i mevcut HEAD'i gösterecek...`);
+      if (linkedList.length > 0 && barColors.current[0]) {
+        barColors.current[0].setValue(1); // Head'i vurgula
+      }
+      await wait(speed / 2);
+      
+      linkedList.unshift(value);
+      setArray([...linkedList]);
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current = [new Animated.Value(0), ...barRefs.current];
+      barColors.current = [new Animated.Value(2), ...barColors.current];
+      
+      if (barColors.current[0]) {
+        barColors.current[0].setValue(2); // Yeni head'i vurgula
+      }
+      setExplanationText(`✅ ${value} başa eklendi! HEAD pointer güncellendi. Zaman: O(1)`);
+      addLogMessage(`Başa ekleme tamamlandı: ${value} eklendi`);
+    } else {
+      setExplanationText(`➕ Sona Ekleme: ${value} için yeni düğüm oluşturuluyor...`);
+      addLogMessage(`Sona ekleme demo: ${value} ekleniyor`);
+      await wait(speed / 2);
+      
+      setExplanationText(`🔍 Son düğümü bulmak için listede dolaşıyoruz... O(n)`);
+      // Son düğüme kadar git
+      for (let i = 0; i < linkedList.length; i++) {
+        if (barColors.current[i]) {
+          barColors.current[i].setValue(1);
+        }
+        await wait(speed / 4);
+      }
+      await wait(speed / 2);
+      
+      linkedList.push(value);
+      setArray([...linkedList]);
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current.push(new Animated.Value(0));
+      barColors.current.push(new Animated.Value(2));
+      
+      const lastIndex = linkedList.length - 1;
+      if (barColors.current[lastIndex]) {
+        barColors.current[lastIndex].setValue(2); // Yeni tail'i vurgula
+      }
+      setExplanationText(`✅ ${value} sona eklendi! Son düğümün next'i güncellendi. Zaman: O(n)`);
+      addLogMessage(`Sona ekleme tamamlandı: ${value} eklendi`);
+    }
+    await wait(speed);
+  };
+  
+  const demoSearch = async (linkedList: number[]) => {
+    if (linkedList.length > 0) {
+      // Barları normal renge döndür
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(0);
+      });
+      
+      const searchValue = linkedList[Math.floor(linkedList.length / 2)];
+      setExplanationText(`🔍 Doğrusal Arama: ${searchValue} değeri HEAD'den başlayarak aranıyor...`);
+      addLogMessage(`Arama demo: ${searchValue} aranıyor`);
+      
+      for (let i = 0; i < linkedList.length; i++) {
+        if (barColors.current[i]) {
+          barColors.current[i].setValue(1); // Karşılaştırma rengi
+        }
+        setExplanationText(`🔍 ${i + 1}. düğüm kontrol ediliyor: ${linkedList[i]} === ${searchValue}?`);
+        addLogMessage(`Düğüm ${i+1} kontrol ediliyor: ${linkedList[i]} == ${searchValue}?`);
+        await wait(speed / 3);
+        
+        if (linkedList[i] === searchValue) {
+          if (barColors.current[i]) {
+            barColors.current[i].setValue(3); // Sıralanmış rengi
+          }
+          setExplanationText(`🎉 ${searchValue} bulundu! ${i + 1} adımda. Average: O(n/2), Worst: O(n)`);
+          addLogMessage(`BULUNDU! ${searchValue} değeri ${i+1}. pozisyonda`);
+          await wait(speed);
+          break;
+        }
+      }
+    }
+  };
+  
+  const demoTraverse = async (linkedList: number[]) => {
+    // Barları normal renge döndür
+    if (barColors.current) {
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(0);
+      });
+    }
+    
+    setExplanationText('🚶‍♂️ Liste Dolaşma: HEAD\'den başlayarak her düğüm next pointer ile ziyaret ediliyor...');
+    addLogMessage('Liste dolaşma demo başlatıldı');
+    
+    for (let i = 0; i < linkedList.length; i++) {
+      if (barColors.current && barColors.current[i]) {
+        barColors.current[i].setValue(1); // Karşılaştırma rengi (ziyaret)
+      }
+      setExplanationText(`🚶‍♂️ ${i + 1}. düğüm ziyaret edildi: ${linkedList[i]} → next`);
+      addLogMessage(`Düğüm ${i+1} ziyaret edildi: ${linkedList[i]}`);
+      await wait(speed / 3);
+    }
+    
+    // Tüm barları sıralanmış renk yap (tamamlandı)
+    if (barColors.current) {
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(3);
+      });
+    }
+    setExplanationText('✅ Traverse tamamlandı! Tüm düğümler tek tek ziyaret edildi. Zaman: O(n)');
+    addLogMessage('Liste dolaşma tamamlandı');
+    await wait(speed / 2);
+  };
+  
+  const demoDelete = async (linkedList: number[], position: 'head' | 'tail') => {
+    if (linkedList.length === 0) return;
+    
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    if (position === 'head') {
+      const value = linkedList[0];
+      if (barColors.current[0]) {
+        barColors.current[0].setValue(2); // Takas rengi
+      }
+      setExplanationText(`🗑️ Baştan Silme: HEAD düğümü (${value}) siliniyor...`);
+      addLogMessage(`Baştan silme demo: ${value} siliniyor`);
+      await wait(speed);
+      
+      setExplanationText(`🔗 HEAD pointer ikinci düğümü gösterecek şekilde güncelleniyor...`);
+      if (linkedList.length > 1 && barColors.current[1]) {
+        barColors.current[1].setValue(1); // İkinci düğümü vurgula
+      }
+      await wait(speed / 2);
+      
+      linkedList.shift();
+      // Animasyon değerlerini güncelle
+      barRefs.current.shift();
+      barColors.current.shift();
+      setArray([...linkedList]);
+      setExplanationText(`✅ ${value} silindi! HEAD güncellendi. Zaman: O(1)`);
+      addLogMessage(`Baştan silme tamamlandı: ${value} silindi`);
+    } else {
+      const value = linkedList[linkedList.length - 1];
+      setExplanationText(`🗑️ Sondan Silme: Son düğüm (${value}) için önceki düğüm aranıyor...`);
+      addLogMessage(`Sondan silme demo: ${value} siliniyor`);
+      
+      // Son düğümden önceki düğüme git
+      for (let i = 0; i < linkedList.length - 1; i++) {
+        if (barColors.current[i]) {
+          barColors.current[i].setValue(1); // Karşılaştırma rengi
+        }
+        await wait(speed / 4);
+      }
+      await wait(speed / 2);
+      
+      const lastIndex = linkedList.length - 1;
+      if (barColors.current[lastIndex]) {
+        barColors.current[lastIndex].setValue(2); // Takas rengi
+      }
+      setExplanationText(`🔗 Önceki düğümün next'i NULL olarak ayarlanıyor...`);
+      addLogMessage(`Son düğüm bulundu: Bağlantı koparılıyor`);
+      await wait(speed);
+      
+      linkedList.pop();
+      // Animasyon değerlerini güncelle
+      barRefs.current.pop();
+      barColors.current.pop();
+      setArray([...linkedList]);
+      setExplanationText(`✅ ${value} silindi! Son düğümün bağlantısı kesildi. Zaman: O(n)`);
+      addLogMessage(`Sondan silme tamamlandı: ${value} silindi`);
+    }
+    await wait(speed / 2);
+  };
+  
+  const showMemoryManagement = async (linkedList: number[]) => {
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    setExplanationText('💾 Bellek Yönetimi: Düğümler bellekte rastgele yerlerde saklanır, pointer\'lar onları birbirine bağlar.');
+    addLogMessage('Bellek yönetimi açıklanıyor');
+    await wait(speed);
+    
+    if (linkedList.length > 0) {
+      // Tüm düğümleri farklı bir renk yap
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(1);
+      });
+      setExplanationText(`📊 Bellek Kullanımı: ${linkedList.length} düğüm × (veri + pointer) = Dinamik boyut`);
+      addLogMessage(`Bellek kullanımı: ${linkedList.length} düğüm × (veri + pointer)`);
+      await wait(speed);
+    }
+  };
+  
+  const demoComplete = async (linkedList: number[]) => {
+    // Tüm barları sıralanmış renk yap (tamamlandı)
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(3);
+    });
+    
+    const summary = linkedList.length > 0 ? 
+      `[HEAD→${linkedList.join('→')}→NULL]` : 
+      '[HEAD→NULL (Boş Liste)]';
+      
+    setExplanationText(`✅ Bağlı Liste Demo tamamlandı! Final durum: ${summary} (${linkedList.length} düğüm)`);
+    addLogMessage(`Demo tamamlandı: ${summary}`);
+    await wait(speed);
+  };
+  
+  // Çift Yönlü Bağlı Liste görselleştirmesi
+  const visualizeDoublyLinkedList = async () => {
+    if (sorting) return;
+    
+    // Operasyon tipine göre uygun fonksiyonu çağır
+    switch (selectedOperation) {
+      case 'demo':
+        await performDoublyLinkedListDemo();
+        break;
+      case 'prepend':
+        await performDoublyPrepend();
+        break;
+      case 'append':
+        await performDoublyAppend();
+        break;
+      case 'insert':
+        // Pozisyona ekleme işlemini performInsertAt fonksiyonunu kullanarak yap
+        await performInsertAt();
+        break;
+      case 'search':
+        // Arama işlemini performSearch fonksiyonunu kullanarak yap
+        await performSearch();
+        break;
+      case 'deleteHead':
+        // Baştan silme işlemini performDeleteHead fonksiyonunu kullanarak yap
+        await performDeleteHead();
+        break;
+      case 'deleteTail':
+        // Sondan silme işlemini performDeleteTail fonksiyonunu kullanarak yap
+        await performDeleteTail();
+        break;
+      case 'deleteValue':
+        // Değer silme işlemini performDeleteValue fonksiyonunu kullanarak yap
+        await performDeleteValue();
+        break;
+      case 'traverse':
+        await performDoublyTraverse();
+        break;
+      case 'traverseBackward':
+        await performDoublyTraverseBackward();
+        break;
+      case 'clear':
+        // Liste temizleme işlemini performClear fonksiyonunu kullanarak yap
+        await performDoublyClear();
+        break;
+      default:
+        setExplanationText('Lütfen bir işlem seçin.');
+    }
+  };
+  
+  // Demo - Çift yönlü bağlı liste operasyonları
+  const performDoublyLinkedListDemo = async () => {
+    setSorting(true);
+    setCurrentStep(0);
+    setTotalSteps(12);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    try {
+      let linkedList = [...array];
+      setExplanationText('🔗↔️ Çift Yönlü Bağlı Liste Demo: İleri ve geri yönde bağlantıları keşfedelim...');
+      addLogMessage('Çift Yönlü Bağlı Liste Demo başlatıldı');
+      await wait(speed);
+      
+      // Çift yönlü bağlı liste spesifik demo adımları - bu adımlara null kontrolü ekleyeceğiz
+      const doublyOperations = [
+        { name: 'Yapı Açıklaması', action: async () => { try { await explainStructure(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'HEAD & TAIL Pointers', action: async () => { try { await showHeadPointer(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'Başa Ekleme O(1)', action: async () => { try { await doublyDemoInsert(linkedList, 'head'); } catch (e) { console.error(e); } } },
+        { name: 'Sona Ekleme O(1)', action: async () => { try { await doublyDemoInsert(linkedList, 'tail'); } catch (e) { console.error(e); } } },
+        { name: 'Çift Yönlü Arama', action: async () => { try { await doublyDemoSearch(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'İleri Dolaşma', action: async () => { try { await doublyDemoTraverse(linkedList, 'forward'); } catch (e) { console.error(e); } } },
+        { name: 'Geri Dolaşma', action: async () => { try { await doublyDemoTraverse(linkedList, 'backward'); } catch (e) { console.error(e); } } },
+        { name: 'Baştan Silme O(1)', action: async () => { try { await doublyDemoDelete(linkedList, 'head'); } catch (e) { console.error(e); } } },
+        { name: 'Sondan Silme O(1)', action: async () => { try { await doublyDemoDelete(linkedList, 'tail'); } catch (e) { console.error(e); } } },
+        { name: 'Bidirectional Links', action: async () => { try { await showBidirectionalLinks(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'Bellek Avantajları', action: async () => { try { await showDoublyMemoryAdvantages(linkedList); } catch (e) { console.error(e); } } },
+        { name: 'Demo Tamamlandı', action: async () => { try { await doublyDemoComplete(linkedList); } catch (e) { console.error(e); } } }
+      ];
+      
+      for (let i = 0; i < doublyOperations.length; i++) {
+        setCurrentStep(i + 1);
+        addLogMessage(`Demo adım ${i+1}: ${doublyOperations[i].name}`);
+        await doublyOperations[i].action();
+        linkedList = [...array]; // Güncel listeyi al
+      }
+      
+    } catch (error) {
+      console.error("Çift Yönlü Bağlı Liste Demo sırasında hata:", error);
+      setExplanationText("Demo sırasında bir hata oluştu.");
+      addLogMessage("HATA: Çift yönlü liste demo işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Çift yönlü başa ekleme
+  const performDoublyPrepend = async () => {
+    if (!inputValue.trim()) {
+      setExplanationText('⚠️ Lütfen eklenecek değeri girin!');
+      return;
+    }
+    
+    const value = parseInt(inputValue);
+    if (isNaN(value)) {
+      setExplanationText('⚠️ Lütfen geçerli bir sayı girin!');
+      return;
+    }
+    
+    setSorting(true);
+    setCurrentStep(0);
+    setTotalSteps(4);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    try {
+      let linkedList = [...array];
+      
+      setCurrentStep(1);
+      setExplanationText(`➕ Çift yönlü başa ekleme: ${value} için yeni düğüm oluşturuluyor...`);
+      addLogMessage(`Çift yönlü başa ekleme işlemi: ${value}`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      setCurrentStep(2);
+      setExplanationText(`🔗 Yeni düğümün next'i mevcut HEAD'i gösterecek...`);
+      addLogMessage(`Yeni düğümün next'i HEAD'i gösterecek`);
+      if (linkedList.length > 0) {
+        barColors.current[0].setValue(1); // Mevcut head'i vurgula
+      }
+      await wait(speed);
+      
+      setCurrentStep(3);
+      setExplanationText(`🔗↔️ Mevcut HEAD'in previous'ı yeni düğümü gösterecek...`);
+      addLogMessage(`HEAD'in previous'ı yeni düğümü gösterecek (çift yönlü bağlantı)`);
+      await wait(speed);
+      
+      setCurrentStep(4);
+      linkedList.unshift(value);
+      setArray([...linkedList]);
+      barColors.current[0].setValue(2); // Yeni head'i vurgula
+      setExplanationText(`✅ ${value} başa eklendi! HEAD güncellendi, çift yönlü bağlantılar kuruldu. Zaman: O(1)`);
+      addLogMessage(`Başa ekleme tamamlandı: ${value} değeri eklendi`);
+      setInputValue('');
+      
+    } catch (error) {
+      console.error("Doubly Prepend sırasında hata:", error);
+      setExplanationText("İşlem sırasında bir hata oluştu.");
+      addLogMessage("HATA: Çift yönlü başa ekleme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Çift yönlü sona ekleme
+  const performDoublyAppend = async () => {
+    if (!inputValue.trim()) {
+      setExplanationText('⚠️ Lütfen eklenecek değeri girin!');
+      return;
+    }
+    
+    const value = parseInt(inputValue);
+    if (isNaN(value)) {
+      setExplanationText('⚠️ Lütfen geçerli bir sayı girin!');
+      return;
+    }
+    
+    setSorting(true);
+    setCurrentStep(0);
+    setTotalSteps(4);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    try {
+      let linkedList = [...array];
+      
+      setCurrentStep(1);
+      setExplanationText(`➕ Çift yönlü sona ekleme: ${value} için yeni düğüm oluşturuluyor...`);
+      addLogMessage(`Çift yönlü sona ekleme işlemi: ${value}`);
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      setCurrentStep(2);
+      setExplanationText(`🔗 TAIL pointer sayesinde son düğüme direkt erişim! O(1)`);
+      addLogMessage(`TAIL pointer kullanılarak son düğüme erişiliyor`);
+      if (linkedList.length > 0) {
+        barColors.current[linkedList.length - 1].setValue(1); // Mevcut tail'i vurgula
+      }
+      await wait(speed);
+      
+      setCurrentStep(3);
+      setExplanationText(`🔗↔️ Çift yönlü bağlantılar kuruluyor: previous ← → next`);
+      addLogMessage(`Çift yönlü bağlantılar kuruluyor: previous ve next`);
+      await wait(speed);
+      
+      setCurrentStep(4);
+      linkedList.push(value);
+      setArray([...linkedList]);
+      barColors.current[linkedList.length - 1].setValue(2); // Yeni tail'i vurgula
+      setExplanationText(`✅ ${value} sona eklendi! TAIL güncellendi, çift yönlü bağlantılar kuruldu. Zaman: O(1)`);
+      addLogMessage(`Sona ekleme tamamlandı: ${value} değeri eklendi`);
+      setInputValue('');
+      
+    } catch (error) {
+      console.error("Doubly Append sırasında hata:", error);
+      setExplanationText("İşlem sırasında bir hata oluştu.");
+      addLogMessage("HATA: Çift yönlü sona ekleme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Çift yönlü ileri traverse
+  const performDoublyTraverse = async () => {
+    if (array.length === 0) {
+      setExplanationText('⚠️ Liste boş! Dolaşılacak eleman yok.');
+      return;
+    }
+    
+    setSorting(true);
+    setCurrentStep(0);
+    setTotalSteps(array.length);
+    setLogMessages([]); // İşlem günlüğünü temizle
+    
+    try {
+      setExplanationText('🚶‍♂️➡️ İleri Dolaşma: HEAD\'den TAIL\'e doğru next pointer\'ları takip ediliyor...');
+      addLogMessage('İleri dolaşma işlemi başlatıldı: HEAD→TAIL');
+      // Barları normal renge döndür
+      barColors.current.forEach(color => color.setValue(0));
+      await wait(speed);
+      
+      for (let i = 0; i < array.length; i++) {
+        setCurrentStep(i + 1);
+        barColors.current[i].setValue(1); // Karşılaştırma rengi (ziyaret)
+        setExplanationText(`➡️ ${i + 1}. düğüm ziyaret edildi: ${array[i]} (next→)`);
+        addLogMessage(`İleri dolaşma: Düğüm ${i+1} ziyaret edildi: ${array[i]}`);
+        await wait(speed);
+      }
+      
+      // Tüm barları sıralanmış renk yap (tamamlandı)
+      barColors.current.forEach(color => color.setValue(3));
+      setExplanationText(`✅ İleri dolaşma tamamlandı! ${array.length} düğüm HEAD→TAIL yönünde ziyaret edildi.`);
+      addLogMessage(`İleri dolaşma tamamlandı: ${array.length} düğüm ziyaret edildi`);
+      
+    } catch (error) {
+      console.error("Doubly Traverse sırasında hata:", error);
+      setExplanationText("Dolaşma sırasında bir hata oluştu.");
+      addLogMessage("HATA: İleri dolaşma işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  // Çift yönlü geri traverse
+  const performDoublyTraverseBackward = async () => {
+    if (array.length === 0) {
+      setExplanationText('⚠️ Liste boş! Dolaşılacak eleman yok.');
+      return;
+    }
+    
+    try {
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(array.length);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      setExplanationText('🚶‍♂️⬅️ Geri Dolaşma: TAIL\'den HEAD\'e doğru previous pointer\'ları takip ediliyor...');
+      addLogMessage('Geri dolaşma işlemi başlatıldı: TAIL←HEAD');
+      
+      // Barları normal renge döndür - null kontrolü ile
+      if (barColors.current) {
+        barColors.current.forEach((color, index) => {
+          if (color) color.setValue(0);
+        });
+      }
+      
+      await wait(speed);
+      
+      for (let i = array.length - 1; i >= 0; i--) {
+        setCurrentStep(array.length - i);
+        if (barColors.current && barColors.current[i]) {
+          barColors.current[i].setValue(1); // Karşılaştırma rengi (ziyaret)
+        }
+        setExplanationText(`⬅️ ${array.length - i}. adım: ${array[i]} (←previous)`);
+        addLogMessage(`Geri dolaşma: Düğüm ${i+1} ziyaret edildi: ${array[i]}`);
+        await wait(speed);
+      }
+      
+      // Tüm barları sıralanmış renk yap (tamamlandı)
+      if (barColors.current) {
+        barColors.current.forEach((color, index) => {
+          if (color) color.setValue(3);
+        });
+      }
+      
+      setExplanationText(`✅ Geri dolaşma tamamlandı! ${array.length} düğüm TAIL←HEAD yönünde ziyaret edildi.`);
+      addLogMessage(`Geri dolaşma tamamlandı: ${array.length} düğüm ziyaret edildi`);
+      
+    } catch (error) {
+      console.error("Doubly Traverse Backward sırasında hata:", error);
+      setExplanationText("Geri dolaşma sırasında bir hata oluştu.");
+      addLogMessage("HATA: Geri dolaşma işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  const doublyDemoInsert = async (linkedList: number[], position: 'head' | 'tail') => {
+    const value = Math.floor(Math.random() * 100) + 1;
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    if (position === 'head') {
+      setExplanationText(`➕ Başa Ekleme: Yeni düğüm (${value}) oluşturuluyor...`);
+      addLogMessage(`Başa ekleme demo: ${value} ekleniyor`);
+      await wait(speed / 2);
+      
+      setExplanationText(`🔗 Yeni düğümün next'i mevcut HEAD'i gösterecek...`);
+      if (linkedList.length > 0 && barColors.current[0]) {
+        barColors.current[0].setValue(1); // Head'i vurgula
+      }
+      await wait(speed / 2);
+      
+      setExplanationText(`🔗↔️ Mevcut HEAD'in previous'ı yeni düğümü gösterecek...`);
+      await wait(speed / 2);
+      
+      linkedList.unshift(value);
+      setArray([...linkedList]);
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current = [new Animated.Value(0), ...barRefs.current];
+      barColors.current = [new Animated.Value(2), ...barColors.current];
+      
+      if (barColors.current[0]) {
+        barColors.current[0].setValue(2); // Yeni head'i vurgula
+      }
+      setExplanationText(`✅ ${value} başa eklendi! Zaman: O(1)`);
+      addLogMessage(`Başa ekleme tamamlandı: ${value} eklendi`);
+    } else {
+      setExplanationText(`➕ Sona Ekleme: ${value} için yeni düğüm oluşturuluyor...`);
+      addLogMessage(`Sona ekleme demo: ${value} ekleniyor`);
+      await wait(speed / 2);
+      
+      setExplanationText(`🔗 TAIL sayesinde son düğüme direkt erişim! O(1)`);
+      if (linkedList.length > 0 && barColors.current[linkedList.length - 1]) {
+        barColors.current[linkedList.length - 1].setValue(1); // Tail'i vurgula
+      }
+      await wait(speed / 2);
+      
+      setExplanationText(`🔗↔️ Çift yönlü bağlantılar kuruluyor...`);
+      await wait(speed / 2);
+      
+      linkedList.push(value);
+      setArray([...linkedList]);
+      
+      // Animasyon değerlerini güncelle
+      barRefs.current.push(new Animated.Value(0));
+      barColors.current.push(new Animated.Value(2));
+      
+      const lastIndex = linkedList.length - 1;
+      if (barColors.current[lastIndex]) {
+        barColors.current[lastIndex].setValue(2); // Yeni tail'i vurgula
+      }
+      setExplanationText(`✅ ${value} sona eklendi! Zaman: O(1)`);
+      addLogMessage(`Sona ekleme tamamlandı: ${value} eklendi`);
+    }
+    await wait(speed);
+  };
+  
+  const doublyDemoSearch = async (linkedList: number[]) => {
+    if (linkedList.length === 0) return;
+    
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    const searchValue = linkedList[Math.floor(linkedList.length / 2)];
+    setExplanationText(`🔍 Optimized Search: ${searchValue} değeri iki uçtan başlayarak aranıyor...`);
+    addLogMessage(`Çift yönlü arama demo: ${searchValue} aranıyor`);
+    
+    let left = 0;
+    let right = linkedList.length - 1;
+    let found = false;
+    
+    while (left <= right && !found) {
+      // Sol taraftan ara
+      if (barColors.current[left]) {
+        barColors.current[left].setValue(1); // Karşılaştırma rengi
+      }
+      setExplanationText(`🔍 HEAD tarafından ${left + 1}. düğüm kontrol ediliyor: ${linkedList[left]} === ${searchValue}?`);
+      addLogMessage(`HEAD tarafından kontrol: ${linkedList[left]} == ${searchValue}?`);
+      await wait(speed / 3);
+      
+      if (linkedList[left] === searchValue) {
+        if (barColors.current[left]) {
+          barColors.current[left].setValue(3); // Sıralanmış rengi
+        }
+        setExplanationText(`🎉 ${searchValue} bulundu! HEAD tarafından ${left + 1} adımda. O(n/2)`);
+        addLogMessage(`BULUNDU! ${searchValue} değeri ${left+1}. pozisyonda (HEAD tarafından)`);
+        found = true;
+        break;
+      }
+      
+      if (left !== right) {
+        // Sağ taraftan ara
+        if (barColors.current[right]) {
+          barColors.current[right].setValue(1); // Karşılaştırma rengi
+        }
+        setExplanationText(`🔍 TAIL tarafından ${right + 1}. düğüm kontrol ediliyor: ${linkedList[right]} === ${searchValue}?`);
+        addLogMessage(`TAIL tarafından kontrol: ${linkedList[right]} == ${searchValue}?`);
+        await wait(speed / 3);
+        
+        if (linkedList[right] === searchValue) {
+          if (barColors.current[right]) {
+            barColors.current[right].setValue(3); // Sıralanmış rengi
+          }
+          setExplanationText(`🎉 ${searchValue} bulundu! TAIL tarafından ${linkedList.length - right} adımda. O(n/2)`);
+          addLogMessage(`BULUNDU! ${searchValue} değeri ${right+1}. pozisyonda (TAIL tarafından)`);
+          found = true;
+          break;
+        }
+      }
+      
+      // Elemanlar bulunamadı, bir sonraki adıma geç
+      if (barColors.current[left]) barColors.current[left].setValue(0);
+      if (left !== right && barColors.current[right]) barColors.current[right].setValue(0);
+      
+      left++;
+      right--;
+    }
+    
+    if (!found) {
+      setExplanationText(`❌ ${searchValue} değeri listede bulunamadı!`);
+      addLogMessage(`Arama tamamlandı: ${searchValue} değeri bulunamadı`);
+    }
+    
+    await wait(speed);
+  };
+  
+  const doublyDemoTraverse = async (linkedList: number[], direction: 'forward' | 'backward') => {
+    // Barları normal renge döndür
+    if (barColors.current) {
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(0);
+      });
+    }
+    
+    if (direction === 'forward') {
+      setExplanationText('🚶‍♂️➡️ İleri Dolaşma: HEAD\'den TAIL\'e doğru next pointer\'ları takip ediliyor...');
+      addLogMessage('İleri dolaşma demo başlatıldı');
+      
+      for (let i = 0; i < linkedList.length; i++) {
+        if (barColors.current && barColors.current[i]) {
+          barColors.current[i].setValue(1); // Karşılaştırma rengi (ziyaret)
+        }
+        setExplanationText(`➡️ ${i + 1}. düğüm ziyaret edildi: ${linkedList[i]} → next`);
+        addLogMessage(`İleri dolaşma: Düğüm ${i+1} ziyaret edildi: ${linkedList[i]}`);
+        await wait(speed / 3);
+      }
+    } else {
+      setExplanationText('🚶‍♂️⬅️ Geri Dolaşma: TAIL\'den HEAD\'e doğru previous pointer\'ları takip ediliyor...');
+      addLogMessage('Geri dolaşma demo başlatıldı');
+      
+      for (let i = linkedList.length - 1; i >= 0; i--) {
+        if (barColors.current && barColors.current[i]) {
+          barColors.current[i].setValue(1); // Karşılaştırma rengi (ziyaret)
+        }
+        setExplanationText(`⬅️ ${linkedList.length - i}. adım: ${linkedList[i]} ← previous`);
+        addLogMessage(`Geri dolaşma: Düğüm ${i+1} ziyaret edildi: ${linkedList[i]}`);
+        await wait(speed / 3);
+      }
+    }
+    
+    // Tüm barları sıralanmış renk yap (tamamlandı)
+    if (barColors.current) {
+      barColors.current.forEach((color, index) => {
+        if (color) color.setValue(3);
+      });
+    }
+    setExplanationText(`✅ ${direction === 'forward' ? 'İleri' : 'Geri'} dolaşma tamamlandı! O(n)`);
+    addLogMessage(`${direction === 'forward' ? 'İleri' : 'Geri'} dolaşma tamamlandı`);
+    await wait(speed / 2);
+  };
+  
+  const doublyDemoDelete = async (linkedList: number[], position: 'head' | 'tail') => {
+    if (linkedList.length === 0) return;
+    
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    if (position === 'head') {
+      const value = linkedList[0];
+      if (barColors.current[0]) {
+        barColors.current[0].setValue(2); // Takas rengi
+      }
+      setExplanationText(`🗑️ Baştan Silme: HEAD düğümü (${value}) siliniyor...`);
+      addLogMessage(`Baştan silme demo: ${value} siliniyor`);
+      await wait(speed);
+      
+      setExplanationText(`🔗 HEAD pointer ikinci düğümü gösterecek...`);
+      if (linkedList.length > 1 && barColors.current[1]) {
+        barColors.current[1].setValue(1); // İkinci düğümü vurgula
+      }
+      await wait(speed / 2);
+      
+      setExplanationText(`🔗↔️ Yeni HEAD'in previous'ı NULL yapılıyor...`);
+      await wait(speed / 2);
+      
+      linkedList.shift();
+      // Animasyon değerlerini güncelle
+      barRefs.current.shift();
+      barColors.current.shift();
+      setArray([...linkedList]);
+      setExplanationText(`✅ ${value} silindi! Zaman: O(1)`);
+      addLogMessage(`Baştan silme tamamlandı: ${value} silindi`);
+    } else {
+      const value = linkedList[linkedList.length - 1];
+      const lastIndex = linkedList.length - 1;
+      if (barColors.current[lastIndex]) {
+        barColors.current[lastIndex].setValue(2); // Takas rengi
+      }
+      setExplanationText(`🗑️ Sondan Silme: TAIL düğümü (${value}) siliniyor...`);
+      addLogMessage(`Sondan silme demo: ${value} siliniyor`);
+      await wait(speed);
+      
+      setExplanationText(`🔗 TAIL pointer önceki düğümü gösterecek...`);
+      if (linkedList.length > 1 && barColors.current[lastIndex - 1]) {
+        barColors.current[lastIndex - 1].setValue(1); // Önceki düğümü vurgula
+      }
+      await wait(speed / 2);
+      
+      setExplanationText(`🔗↔️ Yeni TAIL'in next'i NULL yapılıyor...`);
+      await wait(speed / 2);
+      
+      linkedList.pop();
+      // Animasyon değerlerini güncelle
+      barRefs.current.pop();
+      barColors.current.pop();
+      setArray([...linkedList]);
+      setExplanationText(`✅ ${value} silindi! Zaman: O(1)`);
+      addLogMessage(`Sondan silme tamamlandı: ${value} silindi`);
+    }
+    await wait(speed / 2);
+  };
+  
+  const showBidirectionalLinks = async (linkedList: number[]) => {
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    setExplanationText('🔄 Çift Yönlü Bağlantılar: Düğümler arasında ileri ve geri yönde gezinti sağlar.');
+    addLogMessage('Çift yönlü bağlantılar açıklanıyor');
+    await wait(speed);
+    
+    if (linkedList.length > 1) {
+      // İlk düğüm next bağlantısı
+      if (barColors.current[0]) barColors.current[0].setValue(1);
+      if (barColors.current[1]) barColors.current[1].setValue(1);
+      setExplanationText(`➡️ ${linkedList[0]} → ${linkedList[1]} (next pointer)`);
+      addLogMessage(`${linkedList[0]} → ${linkedList[1]} (next bağlantısı)`);
+      await wait(speed / 2);
+      
+      // İkinci düğüm previous bağlantısı
+      if (barColors.current[0]) barColors.current[0].setValue(1);
+      if (barColors.current[1]) barColors.current[1].setValue(1);
+      setExplanationText(`⬅️ ${linkedList[1]} ← ${linkedList[0]} (previous pointer)`);
+      addLogMessage(`${linkedList[1]} ← ${linkedList[0]} (previous bağlantısı)`);
+      await wait(speed / 2);
+    }
+  };
+  
+  const showDoublyMemoryAdvantages = async (linkedList: number[]) => {
+    // Barları normal renge döndür
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(0);
+    });
+    
+    setExplanationText('💾 Çift Yönlü Liste Avantajları: Hem ileriye hem geriye doğru O(1) zamanda hareket.');
+    addLogMessage('Çift yönlü liste avantajları açıklanıyor');
+    await wait(speed);
+    
+    setExplanationText('⚖️ Trade-off: Daha hızlı işlemler vs. her düğüm için bir extra pointer maliyeti');
+    addLogMessage('Çift yönlü liste dezavantajları: Daha fazla bellek kullanımı');
+    await wait(speed);
+  };
+  
+  const doublyDemoComplete = async (linkedList: number[]) => {
+    // Tüm barları sıralanmış renk yap (tamamlandı)
+    barColors.current.forEach((color, index) => {
+      if (color) color.setValue(3);
+    });
+    
+    const summary = linkedList.length > 0 ? 
+      `[NULL←${linkedList.join('↔')}→NULL]` : 
+      '[NULL←→NULL (Boş Liste)]';
+      
+    setExplanationText(`✅ Çift Yönlü Bağlı Liste Demo tamamlandı! Final durum: ${summary}`);
+    addLogMessage(`Demo tamamlandı: ${summary}`);
+    await wait(speed);
+  };
+  
+  const performDoublyClear = async () => {
+    // Mevcut temizleme fonksiyonunu kullan
+    try {
+      if (array.length === 0) {
+        setExplanationText('⚠️ Liste zaten boş!');
+        return;
+      }
+      
+      setSorting(true);
+      setCurrentStep(0);
+      setTotalSteps(1);
+      setLogMessages([]); // İşlem günlüğünü temizle
+      
+      setCurrentStep(1);
+      setExplanationText('🗑️ Tüm liste temizleniyor...');
+      addLogMessage('Liste temizleme işlemi başlatıldı');
+      
+      // Tüm barları takas rengi yap (siliniyor)
+      if (barColors.current) {
+        barColors.current.forEach((color, index) => {
+          if (color) color.setValue(2);
+        });
+      }
+      
+      await wait(speed);
+      
+      setArray([]);
+      // Animasyon dizilerini de sıfırla
+      barRefs.current = [];
+      barColors.current = [];
+      
+      setExplanationText('✅ Liste tamamen temizlendi! HEAD ve TAIL pointer\'ları NULL olarak ayarlandı.');
+      addLogMessage('Liste temizleme tamamlandı: Tüm düğümler silindi');
+    } catch (error) {
+      console.error("Clear sırasında hata:", error);
+      setExplanationText("Temizleme sırasında bir hata oluştu.");
+      addLogMessage("HATA: Liste temizleme işlemi başarısız oldu");
+    } finally {
+      setSorting(false);
+    }
+  };
+  
+  return (
+    <View style={styles.container}>
+      <Text style={styles.visualizationTitle}>{title} Görselleştirmesi</Text>
+      
+      {/* Algoritma bilgi kartı */}
+      <AlgorithmInfoCard algorithmType={algorithmType} />
+      
+      {/* Arama algoritmaları için input alanı */}
+      {(algorithmType.toLowerCase().includes('search') || algorithmType.toLowerCase().includes('arama')) && (
+        <View style={styles.searchInputContainer}>
+          <Text style={styles.searchInputLabel}>Aranacak Sayı:</Text>
+          <TextInput
+            style={styles.searchInput}
+            value={searchTarget}
+            onChangeText={setSearchTarget}
+            placeholder="Örn: 42"
+            keyboardType="numeric"
+            editable={!sorting}
+          />
+        </View>
+      )}
+      
+      {/* Bağlı liste algoritmaları için işlem seçimi */}
+      {(algorithmType.toLowerCase().includes('linked') || 
+        algorithmType.toLowerCase().includes('bağlı liste') || 
+        algorithmType.toLowerCase().includes('dairesel')) && (
+        <View style={styles.linkedListControls}>
+          <Text style={styles.controlLabel}>İşlem Seçin:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.operationSelector}>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'demo' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('demo')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'demo' && styles.selectedOperationText]}>Demo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'prepend' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('prepend')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'prepend' && styles.selectedOperationText]}>Başa Ekle</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'append' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('append')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'append' && styles.selectedOperationText]}>Sona Ekle</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'insert' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('insert')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'insert' && styles.selectedOperationText]}>Konuma Ekle</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'search' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('search')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'search' && styles.selectedOperationText]}>Ara</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'deleteHead' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('deleteHead')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'deleteHead' && styles.selectedOperationText]}>Baştan Sil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'deleteTail' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('deleteTail')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'deleteTail' && styles.selectedOperationText]}>Sondan Sil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'deleteValue' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('deleteValue')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'deleteValue' && styles.selectedOperationText]}>Değer Sil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'traverse' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('traverse')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'traverse' && styles.selectedOperationText]}>Dolaş</Text>
+            </TouchableOpacity>
+            
+            {/* Çift Yönlü Bağlı Liste için geri dolaşma */}
+            {(algorithmType.toLowerCase().includes('doubly') || 
+              algorithmType.toLowerCase().includes('çift')) && (
+              <TouchableOpacity
+                style={[styles.operationButton, selectedOperation === 'traverseBackward' && styles.selectedOperation]}
+                onPress={() => setSelectedOperation('traverseBackward')}
+                disabled={sorting}
+              >
+                <Text style={[styles.operationButtonText, selectedOperation === 'traverseBackward' && styles.selectedOperationText]}>Geri Dolaş</Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity
+              style={[styles.operationButton, selectedOperation === 'clear' && styles.selectedOperation]}
+              onPress={() => setSelectedOperation('clear')}
+              disabled={sorting}
+            >
+              <Text style={[styles.operationButtonText, selectedOperation === 'clear' && styles.selectedOperationText]}>Temizle</Text>
+            </TouchableOpacity>
+          </ScrollView>
+          
+          {/* İşlem parametreleri */}
+          <View style={styles.operationParams}>
+            {(selectedOperation === 'prepend' || 
+              selectedOperation === 'append' || 
+              selectedOperation === 'insert' || 
+              selectedOperation === 'search' || 
+              selectedOperation === 'deleteValue') && (
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>Değer:</Text>
+                <TextInput
+                  style={styles.valueInput}
+                  value={inputValue}
+                  onChangeText={setInputValue}
+                  placeholder="Örn: 42"
+                  keyboardType="numeric"
+                  editable={!sorting}
+                />
+              </View>
+            )}
+            
+            {selectedOperation === 'insert' && (
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>Pozisyon:</Text>
+                <TextInput
+                  style={styles.valueInput}
+                  value={insertPosition}
+                  onChangeText={setInsertPosition}
+                  placeholder="Örn: 2"
+                  keyboardType="numeric"
+                  editable={!sorting}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+      
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={[styles.button, sorting && styles.disabledButton]}
+          onPress={startVisualization}
+          disabled={sorting}
+        >
+          <Text style={styles.buttonText}>Başlat</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.button, sorting && styles.disabledButton]}
+          onPress={resetArray}
+          disabled={sorting}
+        >
+          <Text style={styles.buttonText}>Yeni Liste</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.speedControl}>
+        <Text style={styles.speedText}>Hız: </Text>
+        <TouchableOpacity
+          style={[styles.speedButton, speed === 1000 && styles.activeSpeedButton]}
+          onPress={() => setSpeed(1000)}
+          disabled={sorting}
+        >
+          <Text style={[styles.speedButtonText, speed === 1000 && styles.activeSpeedButtonText]}>Yavaş</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.speedButton, speed === 500 && styles.activeSpeedButton]}
+          onPress={() => setSpeed(500)}
+          disabled={sorting}
+        >
+          <Text style={[styles.speedButtonText, speed === 500 && styles.activeSpeedButtonText]}>Orta</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.speedButton, speed === 250 && styles.activeSpeedButton]}
+          onPress={() => setSpeed(250)}
+          disabled={sorting}
+        >
+          <Text style={[styles.speedButtonText, speed === 250 && styles.activeSpeedButtonText]}>Hızlı</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Bağlı liste görselleştirmesi için özel tasarım */}
+      {(algorithmType.toLowerCase().includes('linked') || 
+        algorithmType.toLowerCase().includes('bağlı liste') || 
+        algorithmType.toLowerCase().includes('dairesel')) ? (
+        <View style={styles.linkedListMainContainer}>
+          <Text style={styles.linkedListTitle}>Bağlı Liste Görselleştirmesi</Text>
+          
+          {/* Düğüm gösterimi */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.linkedListContainer}>
+            <View style={styles.linkedListView}>
+              {/* Boş liste mesajı */}
+              {array.length === 0 ? (
+                <View style={styles.emptyListContainer}>
+                  <Text style={styles.emptyListText}>Boş Liste</Text>
+                  <Text style={styles.emptyListText}>HEAD → NULL</Text>
+                </View>
+              ) : (
+                <>
+                  {/* HEAD pointer */}
+                  <View style={styles.headPointerContainer}>
+                    <Text style={styles.pointerLabel}>HEAD</Text>
+                    <View style={styles.pointerArrow} />
+                  </View>
+                  
+                  {/* Bağlı liste düğümleri */}
+                  <View style={styles.nodesContainer}>
+                    {array.map((value, index) => (
+                      <View key={`node-${index}`} style={styles.nodeWrapper}>
+                        {/* Düğüm */}
+                        <Animated.View
+                          style={[
+                            styles.node,
+                            {
+                              backgroundColor: getBarColor(index),
+                              transform: [{ translateX: barRefs.current && barRefs.current[index] ? barRefs.current[index] : new Animated.Value(0) }],
+                            },
+                          ]}
+                        >
+                          <Text style={styles.nodeValue}>{value}</Text>
+                        </Animated.View>
+                        
+                        {/* Next pointer */}
+                        {index < array.length - 1 && (
+                          <View style={styles.nextPointer}>
+                            <View style={styles.pointerLine} />
+                            <View style={styles.pointerHead} />
+                          </View>
+                        )}
+                        
+                        {/* Son düğümün NULL göstergesi */}
+                        {index === array.length - 1 && (
+                          <View style={styles.nullPointer}>
+                            <View style={styles.pointerLine} />
+                            <Text style={styles.nullText}>NULL</Text>
+                          </View>
+                        )}
+                        
+                        {/* Çift yönlü bağlı liste için previous pointer */}
+                        {(algorithmType.toLowerCase().includes('doubly') || 
+                          algorithmType.toLowerCase().includes('çift')) && 
+                          index > 0 && (
+                          <View style={styles.prevPointer}>
+                            <View style={styles.prevPointerLine} />
+                            <View style={styles.prevPointerHead} />
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                  
+                  {/* TAIL pointer */}
+                  {(algorithmType.toLowerCase().includes('doubly') || 
+                    algorithmType.toLowerCase().includes('çift')) && (
+                    <View style={styles.tailPointerContainer}>
+                      <Text style={styles.pointerLabel}>TAIL</Text>
+                      <View style={styles.pointerArrow} />
+                    </View>
+                  )}
+                  
+                  {/* Dairesel bağlı liste için dairesel bağlantı */}
+                  {(algorithmType.toLowerCase().includes('circular') || 
+                    algorithmType.toLowerCase().includes('dairesel')) && (
+                    <View style={styles.circularPointer}>
+                      <View style={styles.circularPointerLine} />
+                      <View style={styles.circularPointerHead} />
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          </ScrollView>
+          
+          {/* Açıklama metni */}
+          <View style={styles.linkedListExplanation}>
+            <Text style={styles.explanationText}>{explanationText}</Text>
+            {totalSteps > 0 && (
+              <Text style={styles.stepCounter}>
+                Adım: {currentStep} / {totalSteps}
+              </Text>
+            )}
+          </View>
+          
+          {/* İşlem Günlüğü */}
+          {logMessages.length > 0 && (
+            <View style={styles.logContainer}>
+              <Text style={styles.logTitle}>İşlem Günlüğü:</Text>
+              <ScrollView style={styles.logScroll}>
+                {logMessages.map((msg, idx) => (
+                  <Text key={`log-${idx}`} style={styles.logMessage}>
+                    {idx + 1}. {msg}
+                  </Text>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      ) : (
+        <ScrollView horizontal style={styles.visualizationContainer}>
+          <View style={styles.barContainer}>
+            {array.map((value, index) => (
+              <Animated.View
+                key={`bar-${index}`}
+                style={[
+                  styles.bar,
+                  {
+                    height: (value / 100) * MAX_BAR_HEIGHT,
+                    backgroundColor: getBarColor(index),
+                    transform: [{ translateX: barRefs.current && barRefs.current[index] ? barRefs.current[index] : new Animated.Value(0) }],
+                  },
+                ]}
+              >
+                <Text style={styles.barText}>{value}</Text>
+              </Animated.View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 10,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    minHeight: 400,
+  },
+  visualizationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 15,
+    gap: 10,
+  },
+  button: {
+    backgroundColor: '#6c5ce7',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    elevation: 2,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  disabledButton: {
+    backgroundColor: '#a29bfe',
+    opacity: 0.7,
+  },
+  visualizationContainer: {
+    height: MAX_BAR_HEIGHT + 50,
+    marginBottom: 15,
+  },
+  barContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: MAX_BAR_HEIGHT + 30,
+    paddingBottom: 10,
+  },
+  bar: {
+    width: BAR_WIDTH,
+    marginHorizontal: BAR_MARGIN,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 5,
+  },
+  barText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  explanationContainer: {
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 5,
+    minHeight: 60,
+    elevation: 1,
+  },
+  explanationText: {
+    fontSize: 14,
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  stepCounter: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  speedControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  speedText: {
+    fontSize: 14,
+    color: '#2c3e50',
+    marginRight: 10,
+  },
+  speedButton: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    backgroundColor: '#f1f2f6',
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  activeSpeedButton: {
+    backgroundColor: '#6c5ce7',
+    borderColor: '#5b4bc4',
+  },
+  speedButtonText: {
+    fontSize: 12,
+    color: '#2c3e50',
+  },
+  activeSpeedButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  searchInputLabel: {
+    fontSize: 14,
+    color: '#2c3e50',
+    marginRight: 10,
+    fontWeight: '500',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    backgroundColor: 'white',
+    minWidth: 80,
+    textAlign: 'center',
+  },
+  linkedListControls: {
+    marginBottom: 15,
+  },
+  controlLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2c3e50',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  operationSelector: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  operationButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 15,
+    backgroundColor: '#f1f2f6',
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    elevation: 1,
+  },
+  selectedOperation: {
+    backgroundColor: '#6c5ce7',
+    borderColor: '#5b4bc4',
+  },
+  operationButtonText: {
+    fontSize: 12,
+    color: '#2c3e50',
+  },
+  selectedOperationText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  operationParams: {
+    marginTop: 5,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 5,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#2c3e50',
+    marginRight: 10,
+  },
+  valueInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 14,
+    backgroundColor: 'white',
+    minWidth: 80,
+    textAlign: 'center',
+  },
+  logContainer: {
+    marginTop: 15,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 5,
+    padding: 10,
+    maxHeight: 150,
+    elevation: 1,
+  },
+  logTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2c3e50',
+    marginBottom: 5,
+  },
+  logScroll: {
+    maxHeight: 120,
+  },
+  logMessage: {
+    fontSize: 12,
+    color: '#2c3e50',
+    marginBottom: 2,
+  },
+  
+  // Bağlı liste görselleştirme stilleri
+  linkedListMainContainer: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    minHeight: 200,
+  },
+  linkedListTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6c5ce7',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  linkedListContainer: {
+    minHeight: 150,
+    maxHeight: 180,
+    marginBottom: 15,
+    backgroundColor: '#f7f7f7',
+    borderRadius: 8,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  linkedListView: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    minWidth: '100%',
+    position: 'relative',
+  },
+  nodesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 10,
+    paddingRight: 20,
+  },
+  headPointerContainer: {
+    position: 'absolute',
+    top: -30,
+    left: 20,
+    alignItems: 'center',
+  },
+  nodeWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  node: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#333',
+    backgroundColor: '#6c5ce7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  nodeValue: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  nextPointer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 40,
+  },
+  pointerLine: {
+    height: 3,
+    backgroundColor: '#333',
+    flex: 1,
+  },
+  pointerHead: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#333',
+    transform: [{ rotate: '90deg' }],
+  },
+  prevPointer: {
+    position: 'absolute',
+    top: -20,
+    left: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 40,
+  },
+  prevPointerLine: {
+    height: 3,
+    backgroundColor: '#2980b9',
+    flex: 1,
+  },
+  prevPointerHead: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#2980b9',
+    transform: [{ rotate: '-90deg' }],
+  },
+  nullPointer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  nullText: {
+    color: '#e74c3c',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  pointerLabel: {
+    color: '#2c3e50',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  pointerArrow: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#2c3e50',
+  },
+  tailPointerContainer: {
+    position: 'absolute',
+    top: -35,
+    right: 20,
+    alignItems: 'center',
+  },
+  circularPointer: {
+    position: 'absolute',
+    bottom: -20,
+    left: 30,
+    right: 30,
+    height: 40,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#8e44ad',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  circularPointerLine: {
+    position: 'absolute',
+    top: -3,
+    left: 0,
+    height: 3,
+    width: '100%',
+    backgroundColor: '#8e44ad',
+  },
+  circularPointerHead: {
+    position: 'absolute',
+    top: -12,
+    left: 0,
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#8e44ad',
+    transform: [{ rotate: '-90deg' }],
+  },
+  emptyListContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  emptyListText: {
+    fontSize: 18,
+    color: '#7f8c8d',
+    marginBottom: 10,
+  },
+  linkedListExplanation: {
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 5,
+    minHeight: 60,
+    marginBottom: 10,
+  },
+});
+
+export default AlgorithmVisualization;

@@ -2385,7 +2385,7 @@ app.use((err, req, res, next) => {
 });
 
 // Server'ı başlat
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server ${PORT} portunda çalışıyor`);
 });

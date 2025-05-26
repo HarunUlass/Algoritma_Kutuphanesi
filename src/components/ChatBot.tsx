@@ -66,16 +66,210 @@ const predefinedQuestions = [
     id: 'q4',
     text: 'En verimli sıralama algoritması hangisidir?',
     value: 'efficient_sorting'
+  },
+  {
+    id: 'q5',
+    text: 'Veri yapıları hakkında bilgi almak istiyorum',
+    value: 'data_structures'
+  },
+  {
+    id: 'q6',
+    text: 'Makine öğrenmesi algoritmaları nelerdir?',
+    value: 'machine_learning'
+  },
+  {
+    id: 'q7',
+    text: 'Derin öğrenme teknikleri hakkında bilgi almak istiyorum',
+    value: 'deep_learning'
+  },
+  {
+    id: 'q8',
+    text: 'Algoritma karmaşıklığı nedir?',
+    value: 'algorithm_complexity'
   }
 ];
 
+// Alt kategoriler ve alt sorular
+interface SubCategoryQuestionMap {
+  [category: string]: ChatOption[];
+}
+
+const subCategoryQuestions: SubCategoryQuestionMap = {
+  // Veri yapıları alt kategorileri
+  data_structures: [
+    {
+      id: 'ds1',
+      text: 'Diziler (Arrays) hakkında bilgi almak istiyorum',
+      value: 'arrays'
+    },
+    {
+      id: 'ds2',
+      text: 'Bağlı Listeler (Linked Lists) nedir?',
+      value: 'linked_lists'
+    },
+    {
+      id: 'ds3',
+      text: 'Ağaç (Tree) veri yapıları nelerdir?',
+      value: 'trees'
+    },
+    {
+      id: 'ds4',
+      text: 'Yığın (Stack) ve Kuyruk (Queue) yapıları',
+      value: 'stacks_queues'
+    },
+    {
+      id: 'ds5',
+      text: 'Hash Tabloları nasıl çalışır?',
+      value: 'hash_tables'
+    }
+  ],
+  
+  // Sıralama algoritmaları alt kategorileri
+  sorting: [
+    {
+      id: 'sort1',
+      text: 'Bubble Sort algoritması nasıl çalışır?',
+      value: 'bubble_sort'
+    },
+    {
+      id: 'sort2',
+      text: 'Quick Sort hakkında bilgi almak istiyorum',
+      value: 'quick_sort'
+    },
+    {
+      id: 'sort3',
+      text: 'Merge Sort nasıl uygulanır?',
+      value: 'merge_sort'
+    },
+    {
+      id: 'sort4',
+      text: 'Insertion Sort ve Selection Sort arasındaki farklar',
+      value: 'insertion_selection_sort'
+    },
+    {
+      id: 'sort5',
+      text: 'Heap Sort algoritması nedir?',
+      value: 'heap_sort'
+    }
+  ],
+  
+  // Arama algoritmaları alt kategorileri
+  searching: [
+    {
+      id: 'search1',
+      text: 'Linear Search nasıl çalışır?',
+      value: 'linear_search'
+    },
+    {
+      id: 'search2',
+      text: 'Binary Search algoritması',
+      value: 'binary_search'
+    },
+    {
+      id: 'search3',
+      text: 'Hash tabanlı arama yöntemleri',
+      value: 'hash_search'
+    },
+    {
+      id: 'search4',
+      text: 'İkili arama ağacında arama',
+      value: 'bst_search'
+    }
+  ],
+  
+  // Graf algoritmaları alt kategorileri
+  graph: [
+    {
+      id: 'graph1',
+      text: 'DFS (Depth First Search) algoritması',
+      value: 'dfs'
+    },
+    {
+      id: 'graph2',
+      text: 'BFS (Breadth First Search) nasıl çalışır?',
+      value: 'bfs'
+    },
+    {
+      id: 'graph3',
+      text: 'Dijkstra algoritması nedir?',
+      value: 'dijkstra'
+    },
+    {
+      id: 'graph4',
+      text: 'Minimum Spanning Tree algoritmaları',
+      value: 'mst'
+    },
+    {
+      id: 'graph5',
+      text: 'Topolojik sıralama nasıl yapılır?',
+      value: 'topological_sort'
+    }
+  ],
+  
+  // Makine Öğrenmesi alt kategorileri
+  machine_learning: [
+    {
+      id: 'ml1',
+      text: 'Denetimli öğrenme algoritmaları',
+      value: 'supervised_learning'
+    },
+    {
+      id: 'ml2',
+      text: 'Denetimsiz öğrenme yöntemleri',
+      value: 'unsupervised_learning'
+    },
+    {
+      id: 'ml3',
+      text: 'Karar ağaçları nasıl çalışır?',
+      value: 'decision_trees'
+    },
+    {
+      id: 'ml4',
+      text: 'Destek vektör makineleri (SVM)',
+      value: 'svm'
+    },
+    {
+      id: 'ml5',
+      text: 'K-Means kümeleme algoritması',
+      value: 'kmeans'
+    }
+  ],
+  
+  // Derin Öğrenme alt kategorileri
+  deep_learning: [
+    {
+      id: 'dl1',
+      text: 'Yapay sinir ağları nasıl çalışır?',
+      value: 'neural_networks'
+    },
+    {
+      id: 'dl2',
+      text: 'CNN (Evrişimli Sinir Ağları) nedir?',
+      value: 'cnn'
+    },
+    {
+      id: 'dl3',
+      text: 'RNN ve LSTM modelleri',
+      value: 'rnn_lstm'
+    },
+    {
+      id: 'dl4',
+      text: 'Transformer mimarisi hakkında bilgi',
+      value: 'transformers'
+    }
+  ]
+};
+
 // Algoritma kategorileri ve anahtar kelimeler
 const algorithmKeywords = {
-  sorting: ['sıralama', 'sort', 'düzenleme', 'bubble', 'quick', 'merge', 'insertion', 'selection'],
-  searching: ['arama', 'search', 'bulma', 'binary', 'linear', 'hash'],
-  graph: ['graf', 'graph', 'ağaç', 'tree', 'dfs', 'bfs', 'dijkstra', 'yol bulma', 'path finding'],
+  sorting: ['sıralama', 'sort', 'düzenleme', 'bubble', 'quick', 'merge', 'insertion', 'selection', 'heap'],
+  searching: ['arama', 'search', 'bulma', 'binary', 'linear', 'hash', 'ikili arama', 'doğrusal arama'],
+  graph: ['graf', 'graph', 'ağaç', 'tree', 'dfs', 'bfs', 'dijkstra', 'yol bulma', 'path finding', 'en kısa yol', 'minimum spanning'],
   dynamic: ['dinamik', 'dynamic', 'programlama', 'programming', 'dp', 'optimizasyon'],
-  beginner: ['başlangıç', 'beginner', 'temel', 'kolay']
+  beginner: ['başlangıç', 'beginner', 'temel', 'kolay'],
+  data_structures: ['veri yapıları', 'veri yapısı', 'data structure', 'array', 'dizi', 'list', 'liste', 'tree', 'ağaç', 'queue', 'kuyruk', 'stack', 'yığın', 'hash'],
+  machine_learning: ['makine öğrenmesi', 'ml', 'yapay zeka', 'ai', 'svm', 'karar ağacı', 'decision tree', 'regresyon', 'regression', 'sınıflandırma', 'classification', 'kümeleme', 'clustering'],
+  deep_learning: ['derin öğrenme', 'deep learning', 'dl', 'neural network', 'sinir ağı', 'cnn', 'rnn', 'lstm', 'transformer']
 };
 
 const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onClose }) => {
@@ -113,7 +307,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onClose }) => {
         content: 'Merhaba! Ben algoritma asistanınızım. Size hangi konuda yardımcı olabilirim?',
         role: 'bot',
         timestamp: new Date(),
-        options: predefinedQuestions.slice(0, 4)
+        options: predefinedQuestions
       };
       
       setMessages([welcomeMessage]);
@@ -168,7 +362,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onClose }) => {
         content: 'Merhaba! Size algoritma konusunda nasıl yardımcı olabilirim?',
         role: 'bot',
         timestamp: new Date(),
-        options: predefinedQuestions.slice(0, 3)
+        options: predefinedQuestions.slice(0, 4)
       };
     }
     
@@ -178,20 +372,92 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onClose }) => {
         content: 'Rica ederim! Başka bir sorunuz var mı?',
         role: 'bot',
         timestamp: new Date(),
-        options: predefinedQuestions.slice(2)
+        options: predefinedQuestions.slice(0, 4)
       };
+    }
+    
+    // Alt kategori kontrolü - eğer sorgu bir kategori değerine eşleşiyorsa
+    // o kategorinin alt sorularını göster
+    const categoryValues = predefinedQuestions.map(q => q.value);
+    for (const category of categoryValues) {
+      if (userQuery === category && subCategoryQuestions[category]) {
+        // Alt kategorilere ek olarak ana kategorilere dönüş seçeneği
+        const subcategoryOptions = [...subCategoryQuestions[category]];
+        subcategoryOptions.push({
+          id: 'back_main',
+          text: '« Ana Kategorilere Dön',
+          value: 'main_categories'
+        });
+        
+        return {
+          id: Date.now().toString(),
+          content: `${category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' ')} ile ilgili sorularınız için aşağıdaki seçeneklerden birini seçebilirsiniz:`,
+          role: 'bot',
+          timestamp: new Date(),
+          options: subcategoryOptions
+        };
+      }
+    }
+    
+    // Ana kategorilere dönüş seçeneği için özel yanıt
+    if (userQuery === 'main_categories') {
+      return {
+        id: Date.now().toString(),
+        content: 'Ana kategoriler burada. Hangi konuda yardım istersiniz?',
+        role: 'bot',
+        timestamp: new Date(),
+        options: predefinedQuestions
+      };
+    }
+    
+    // Alt kategori sorguları için detaylı yanıtlar
+    // Örneğin: bubble_sort, binary_search, dfs gibi
+    if (userQuery.includes('_')) {
+      // Bu basit bir demo için. Gerçek uygulamada her algoritma için özel yanıtlar oluşturulabilir
+      const specificAlgorithm = matchingAlgorithms.find(algo => 
+        algo.title.toLowerCase().includes(userQuery.split('_').join(' '))
+      );
+      
+      if (specificAlgorithm) {
+        // Gerçek API ID'sini veya bir özel ID oluştur
+        const algorithmId = specificAlgorithm._id || specificAlgorithm.id || `algo_${Date.now()}`;
+        
+        console.log('Bulunan özel algoritma:', specificAlgorithm.title, 'ID:', algorithmId);
+        
+        return {
+          id: Date.now().toString(),
+          content: `${specificAlgorithm.title} algoritması hakkında bilgi:`,
+          role: 'bot',
+          timestamp: new Date(),
+          suggestions: [{
+            id: algorithmId,
+            title: specificAlgorithm.title,
+            description: specificAlgorithm.description,
+            complexity: specificAlgorithm.complexity?.time?.average || specificAlgorithm.complexity?.time?.worst || specificAlgorithm.complexity || 'Belirtilmemiş',
+            category: specificAlgorithm.category || 'Genel',
+            difficulty: specificAlgorithm.difficulty || 'Orta'
+          }]
+        };
+      }
     }
     
     // Algoritma öneri yanıtı
     if (matchingAlgorithms.length > 0) {
-      const suggestions = matchingAlgorithms.slice(0, 3).map(algo => ({
-        id: algo._id || algo.id,
-        title: algo.title,
-        description: algo.description,
-        complexity: algo.complexity?.time?.average || algo.complexity?.time?.worst || algo.complexity || 'Belirtilmemiş',
-        category: algo.category || 'Genel',
-        difficulty: algo.difficulty || 'Orta'
-      }));
+      const suggestions = matchingAlgorithms.slice(0, 3).map(algo => {
+        // Gerçek API ID'sini veya bir özel ID oluştur
+        const algorithmId = algo._id || algo.id || `algo_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        
+        return {
+          id: algorithmId,
+          title: algo.title,
+          description: algo.description,
+          complexity: algo.complexity?.time?.average || algo.complexity?.time?.worst || algo.complexity || 'Belirtilmemiş',
+          category: algo.category || 'Genel',
+          difficulty: algo.difficulty || 'Orta'
+        };
+      });
+      
+      console.log('Bulunan algoritmalar:', matchingAlgorithms.length, 'Öneriler:', suggestions.length);
       
       return {
         id: Date.now().toString(),
@@ -304,8 +570,51 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onClose }) => {
   // Algoritma detaylarına git
   const handleAlgorithmClick = (algorithmId: string) => {
     onClose();
-    // @ts-ignore - navigation türündeki type hatası için
-    navigation.navigate('AlgorithmDetail', { algorithmId });
+    try {
+      // Debug: Tüm mesajları ve önerileri logla
+      console.log('Tüm mesajlar:', messages.length);
+      const allSuggestions = messages.flatMap(msg => msg.suggestions || []);
+      console.log('Tüm öneriler:', allSuggestions.length);
+      
+      // Seçilen algoritma önerisini bul
+      const selectedSuggestion = messages.flatMap(msg => msg.suggestions || [])
+        .find(suggestion => suggestion.id === algorithmId);
+      
+      console.log('Seçilen algoritma ID:', algorithmId);
+      console.log('Bulunan algoritma:', selectedSuggestion);
+      
+      if (!selectedSuggestion) {
+        console.error('Seçilen algoritma bulunamadı:', algorithmId);
+        return;
+      }
+      
+      // Algoritma detay sayfasının beklediği formatta algorithm nesnesi oluştur
+      const algorithmObject = {
+        id: selectedSuggestion.id,
+        title: selectedSuggestion.title,
+        description: selectedSuggestion.description,
+        complexity: selectedSuggestion.complexity,
+        category: selectedSuggestion.category,
+        difficulty: selectedSuggestion.difficulty || 'Orta'
+      };
+      
+      console.log('Oluşturulan algoritma nesnesi:', algorithmObject);
+      
+      // İlk önce navigation nesnesini kontrol et
+      if (navigation) {
+        // @ts-ignore - navigation türündeki type hatası için
+        navigation.navigate('AlgorithmDetail', { algorithm: algorithmObject });
+      } else {
+        console.error('Navigation nesnesi tanımlı değil');
+      }
+    } catch (error) {
+      console.error('Algoritma detayına yönlendirme hatası:', error);
+      // Hata durumunda ana ekrana yönlendir
+      if (navigation) {
+        // @ts-ignore
+        navigation.navigate('Home');
+      }
+    }
   };
   
   // Mesaj zamanını biçimlendir
@@ -363,7 +672,10 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onClose }) => {
                     <TouchableOpacity
                       key={suggestion.id}
                       style={styles.algorithmCard}
-                      onPress={() => handleAlgorithmClick(suggestion.id)}
+                      onPress={() => {
+                        console.log('Algoritma kartına tıklandı:', suggestion.id, suggestion.title);
+                        handleAlgorithmClick(suggestion.id);
+                      }}
                     >
                       <Text style={styles.algorithmTitle}>{suggestion.title}</Text>
                       <Text style={styles.algorithmDescription} numberOfLines={2}>
@@ -596,22 +908,20 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     marginTop: 10,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    maxHeight: 200,
+    overflow: 'hidden',
   },
   optionButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#6c5ce7',
-    borderRadius: 16,
-    padding: 6,
-    marginRight: 8,
+    backgroundColor: '#f0f4f9',
+    padding: 8,
+    borderRadius: 8,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#dce1e9',
   },
   optionText: {
-    fontSize: 12,
-    color: '#6c5ce7',
+    fontSize: 13,
+    color: '#4a6583',
   },
   inputContainer: {
     flexDirection: 'row',

@@ -180,27 +180,11 @@ const EditProfile = ({ visible, onClose, onSave, initialData, loading }: EditPro
   );
 };
 
-// Achievement/Badge interface
-interface Achievement {
-  type: string;
-  name: string;
-  description: string;
-  icon: string;
-  level: number;
-  xpReward: number;
-  earned: boolean;
-  earnedAt: string | null;
-}
-
 const ProfileScreen = ({ navigation }: any) => {
   const auth = useContext(AuthContext);
   const { isLoggedIn, viewedAlgorithms, logout, username, setUsername } = auth;
   const userId = auth.userId;
   
-  const [quizStats, setQuizStats] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [achievementsLoading, setAchievementsLoading] = useState(false);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [recentlyViewedAlgorithms, setRecentlyViewedAlgorithms] = useState<any[]>([]);
   const [recentlyViewedLoading, setRecentlyViewedLoading] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -212,9 +196,7 @@ const ProfileScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     if (isLoggedIn && userId) {
-      loadQuizStats();
       loadUserProfile();
-      loadAchievements();
       loadRecentlyViewedAlgorithms();
     }
   }, [isLoggedIn, userId]);
@@ -335,40 +317,6 @@ const ProfileScreen = ({ navigation }: any) => {
     }
   };
 
-  const loadQuizStats = async () => {
-    try {
-      if (!userId) {
-        console.error('loadQuizStats: UserId tanımlı değil');
-        return;
-      }
-      
-      setLoading(true);
-      const data = await api.users.getQuizStats(userId);
-      setQuizStats(data);
-    } catch (error) {
-      console.error('Quiz istatistiklerini getirme hatası:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadAchievements = async () => {
-    try {
-      if (!userId) {
-        console.error('loadAchievements: UserId tanımlı değil');
-        return;
-      }
-      
-      setAchievementsLoading(true);
-      const achievements = await api.users.getAchievements(userId);
-      setAchievements(achievements);
-    } catch (error) {
-      console.error('Rozetleri yükleme hatası:', error);
-    } finally {
-      setAchievementsLoading(false);
-    }
-  };
-
   const loadRecentlyViewedAlgorithms = async () => {
     try {
       if (!userId) {
@@ -431,74 +379,6 @@ const ProfileScreen = ({ navigation }: any) => {
         <Text>→</Text>
       </View>
     </TouchableOpacity>
-  );
-
-  const renderQuizAttemptItem = (attempt: any) => (
-    <View key={attempt.date} style={styles.quizAttemptItem}>
-      <View style={styles.quizAttemptInfo}>
-        <Text style={styles.quizAttemptTitle}>{attempt.quizTitle}</Text>
-        <Text style={styles.quizAttemptAlgorithm}>{attempt.algorithmTitle}</Text>
-        <Text style={styles.quizAttemptDate}>
-          {new Date(attempt.date).toLocaleDateString('tr-TR', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
-        </Text>
-      </View>
-      <View style={styles.quizAttemptResult}>
-        <Text style={styles.quizAttemptScore}>
-          {Math.round((attempt.score / attempt.totalPoints) * 100)}%
-        </Text>
-        <View style={[
-          styles.quizAttemptStatus,
-          attempt.passed ? styles.passedStatus : styles.failedStatus
-        ]}>
-          <Text style={styles.quizAttemptStatusText}>
-            {attempt.passed ? 'Geçti' : 'Kaldı'}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  // Rozet öğesini render et
-  const renderAchievementItem = (achievement: Achievement) => (
-    <View 
-      key={achievement.type} 
-      style={[
-        styles.achievementItem, 
-        achievement.earned ? styles.achievementEarned : styles.achievementLocked
-      ]}
-    >
-      <View style={styles.achievementIconContainer}>
-        <Text style={styles.achievementIcon}>{achievement.icon}</Text>
-        {achievement.level > 1 && (
-          <View style={[
-            styles.achievementLevel, 
-            achievement.level === 2 ? styles.silverLevel : styles.goldLevel
-          ]}>
-            <Text style={styles.achievementLevelText}>
-              {achievement.level === 2 ? 'S' : 'G'}
-            </Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.achievementInfo}>
-        <Text style={styles.achievementName}>{achievement.name}</Text>
-        <Text style={styles.achievementDescription}>{achievement.description}</Text>
-        {achievement.earned && (
-          <Text style={styles.achievementDate}>
-            {new Date(achievement.earnedAt!).toLocaleDateString('tr-TR')}
-          </Text>
-        )}
-      </View>
-      <View style={styles.achievementXP}>
-        <Text style={styles.achievementXPText}>+{achievement.xpReward} XP</Text>
-      </View>
-    </View>
   );
 
   // Profil düzenleme modalını gösterme
@@ -585,85 +465,6 @@ const ProfileScreen = ({ navigation }: any) => {
               <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Rozetler */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Rozetlerim</Text>
-          {achievementsLoading ? (
-            <ActivityIndicator size="large" color="#6c5ce7" style={styles.loader} />
-          ) : achievements && achievements.length > 0 ? (
-            <View style={styles.achievementsContainer}>
-              {/* Kazanılan rozetler */}
-              <Text style={styles.achievementSectionTitle}>Kazanılan Rozetler</Text>
-              {achievements.filter(a => a.earned).length > 0 ? (
-                achievements
-                  .filter(a => a.earned)
-                  .map(achievement => renderAchievementItem(achievement))
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateText}>Henüz rozet kazanmadınız</Text>
-                </View>
-              )}
-
-              {/* Kilitli rozetler */}
-              <Text style={[styles.achievementSectionTitle, { marginTop: 20 }]}>Kilitlenen Rozetler</Text>
-              {achievements.filter(a => !a.earned).length > 0 ? (
-                achievements
-                  .filter(a => !a.earned)
-                  .map(achievement => renderAchievementItem(achievement))
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateText}>Tüm rozetleri kazandınız!</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateText}>Rozetler yüklenemedi</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Quiz İstatistikleri */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Test İstatistikleri</Text>
-          {loading ? (
-            <ActivityIndicator size="large" color="#6c5ce7" style={styles.loader} />
-          ) : quizStats ? (
-            <View style={styles.quizStatsContainer}>
-              <View style={styles.quizStatRow}>
-                <View style={styles.quizStatItem}>
-                  <Text style={styles.quizStatValue}>{quizStats.totalAttempts}</Text>
-                  <Text style={styles.quizStatLabel}>Toplam</Text>
-                </View>
-                <View style={styles.quizStatItem}>
-                  <Text style={styles.quizStatValue}>{quizStats.passedQuizzes}</Text>
-                  <Text style={styles.quizStatLabel}>Başarılı</Text>
-                </View>
-                <View style={styles.quizStatItem}>
-                  <Text style={styles.quizStatValue}>{quizStats.averageScore}%</Text>
-                  <Text style={styles.quizStatLabel}>Ortalama</Text>
-                </View>
-              </View>
-
-              <Text style={styles.recentAttemptsTitle}>Son Test Girişimleri</Text>
-              
-              {quizStats.recentAttempts && quizStats.recentAttempts.length > 0 ? (
-                <View style={styles.recentAttemptsList}>
-                  {quizStats.recentAttempts.map((attempt: any) => renderQuizAttemptItem(attempt))}
-                </View>
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateText}>Henüz test çözmediniz</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateText}>Test istatistikleri yüklenemedi</Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.sectionContainer}>
@@ -813,97 +614,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: '#333',
   },
-  loader: {
-    marginVertical: 20,
-  },
-  quizStatsContainer: {
-    width: '100%',
-  },
-  quizStatRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  quizStatItem: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    padding: 16,
-    borderRadius: 8,
-    margin: 4,
-  },
-  quizStatValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#6c5ce7',
-    marginBottom: 5,
-  },
-  quizStatLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  recentAttemptsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    marginTop: 8,
-    color: '#333',
-  },
-  recentAttemptsList: {
-    width: '100%',
-  },
-  quizAttemptItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  quizAttemptInfo: {
-    flex: 1,
-  },
-  quizAttemptTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  quizAttemptAlgorithm: {
-    fontSize: 14,
-    color: '#6c5ce7',
-    marginBottom: 4,
-  },
-  quizAttemptDate: {
-    fontSize: 12,
-    color: '#999',
-  },
-  quizAttemptResult: {
-    alignItems: 'flex-end',
-    marginLeft: 10,
-  },
-  quizAttemptScore: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  quizAttemptStatus: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  passedStatus: {
-    backgroundColor: '#27ae6020',
-  },
-  failedStatus: {
-    backgroundColor: '#e74c3c20',
-  },
-  quizAttemptStatusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
   algorithmList: {
     width: '100%',
   },
@@ -938,14 +648,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   emptyStateContainer: {
-    padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 20,
   },
   emptyStateText: {
-    fontSize: 16,
     color: '#999',
-    textAlign: 'center',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   notLoggedInContainer: {
     flex: 1,
@@ -1055,98 +765,6 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.7,
-  },
-  achievementsContainer: {
-    width: '100%',
-  },
-  achievementSectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#444',
-    marginBottom: 12,
-  },
-  achievementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  achievementEarned: {
-    backgroundColor: '#f0f7ff',
-    borderColor: '#6c5ce7',
-  },
-  achievementLocked: {
-    backgroundColor: '#f5f5f5',
-    borderColor: '#ddd',
-    opacity: 0.7,
-  },
-  achievementIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6c5ce7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    position: 'relative',
-  },
-  achievementIcon: {
-    fontSize: 18,
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  achievementLevel: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  silverLevel: {
-    backgroundColor: '#b2bec3',
-  },
-  goldLevel: {
-    backgroundColor: '#fdcb6e',
-  },
-  achievementLevelText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  achievementInfo: {
-    flex: 1,
-  },
-  achievementName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  achievementDescription: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  achievementDate: {
-    fontSize: 10,
-    color: '#999',
-  },
-  achievementXP: {
-    backgroundColor: '#9c88ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-    marginLeft: 8,
-  },
-  achievementXPText: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: 'bold',
   },
 });
 
